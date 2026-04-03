@@ -1,0 +1,1067 @@
+import { useState, useMemo, useCallback } from "react";
+
+const DEF = {
+  solarModule:450, solarRacking:120, solarBOP:180, solarInterconnect:80, solarEPC:50, solarSoft:40,
+  windTSA:750, windFoundation:180, windBOP:200, windInterconnect:100, windEPC:80, windSoft:50,
+  gasTurbine:550, gasBOP:120, gasPipeline:40, gasElectrical:60, gasSCR:30, gasEPC:60, gasSoft:40,
+  battCells:150, battBOP:80, battEPC:50, battSite:20, upsCapex:150,
+  solarCF:0.27, windCF:0.38, gasCF:0.90, batteryRTE:0.87, batteryDuration:4, solarWindCorr:0.15,
+  gasPrice:3.50, heatRate:6.6, gasVol:0.35, fuelEsc:0.025,
+  solarOM:12, windOM:28, gasOMFixed:18, gasOMVar:3.5, battOM:6, omEsc:0.02,
+  wacc:0.08, life:25, solarITC:0.30, windPTC:26, battITC:0.30, loadMW:1000,
+};
+const SCEN = [
+  {id:"sb",label:"Solar + Battery",short:"S+B",color:"#D4A026",sources:["solar","battery"]},
+  {id:"wb",label:"Wind + Battery",short:"W+B",color:"#3D7EC7",sources:["wind","battery"]},
+  {id:"gu",label:"Gas + UPS",short:"G+U",color:"#C24B4B",sources:["gas"]},
+  {id:"swb",label:"Solar+Wind+Batt",short:"SW+B",color:"#4A9960",sources:["solar","wind","battery"]},
+  {id:"swgb",label:"Sol+Wind+Gas+Batt",short:"SWG+B",color:"#8B5DB8",sources:["solar","wind","gas","battery"]},
+];
+// Config-specific bull/bear: what's best/worst for EACH config
+const SCENARIO_INPUTS = {
+  sb: {
+    label: "Solar + Battery",
+    inputs: [
+      { key:"solarModule", label:"Solar Module", unit:"$/kW",  base:450, bull:280, bear:700 },
+      { key:"battCells",   label:"Batt Cells",   unit:"$/kWh", base:150, bull:80,  bear:350 },
+      { key:"solarCF",     label:"Solar CF",      unit:"%",     base:0.27,bull:0.33,bear:0.19 },
+      { key:"solarITC",    label:"Solar ITC",     unit:"%",     base:0.30,bull:0.50,bear:0.00 },
+      { key:"battITC",     label:"Batt ITC",      unit:"%",     base:0.30,bull:0.50,bear:0.00 },
+      { key:"wacc",        label:"WACC",           unit:"%",     base:0.08,bull:0.06,bear:0.13 },
+    ],
+    bullLabel: "Cheap panels + storage, high IRA, strong irradiance",
+    bearLabel: "Tariffs on modules, no IRA, poor site, high rates",
+  },
+  wb: {
+    label: "Wind + Battery",
+    inputs: [
+      { key:"windTSA",   label:"Wind TSA",     unit:"$/kW",  base:750, bull:550, bear:1050 },
+      { key:"battCells",  label:"Batt Cells",   unit:"$/kWh", base:150, bull:80,  bear:350 },
+      { key:"windCF",     label:"Wind CF",      unit:"%",     base:0.38,bull:0.48,bear:0.28 },
+      { key:"windPTC",    label:"Wind PTC",     unit:"$/MWh", base:26,  bull:35,  bear:0 },
+      { key:"battITC",    label:"Batt ITC",     unit:"%",     base:0.30,bull:0.50,bear:0.00 },
+      { key:"wacc",       label:"WACC",          unit:"%",     base:0.08,bull:0.06,bear:0.13 },
+    ],
+    bullLabel: "Cheap turbines, great wind site, full PTC",
+    bearLabel: "Expensive turbines, poor site, no PTC, high rates",
+  },
+  gu: {
+    label: "Gas + UPS",
+    inputs: [
+      { key:"gasPrice",   label:"Gas Price",    unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
+      { key:"heatRate",   label:"Heat Rate",    unit:"MMBtu/MWh",base:6.6,bull:6.0,bear:8.5 },
+      { key:"gasTurbine", label:"GT+HRSG+ST",   unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"gasBOP",     label:"Gas BOP",      unit:"$/kW",  base:120, bull:80,  bear:400 },
+      { key:"gasPipeline",label:"Gas Lateral",   unit:"$/kW",  base:40,  bull:15,  bear:200 },
+      { key:"wacc",       label:"WACC",          unit:"%",     base:0.08,bull:0.06,bear:0.13 },
+    ],
+    bullLabel: "Cheap gas ($2 HH), brownfield site, efficient CC",
+    bearLabel: "Gas spike ($8 HH), greenfield w/ long lateral, peaker HR",
+  },
+  swb: {
+    label: "Solar + Wind + Battery",
+    inputs: [
+      { key:"solarModule",label:"Solar Module",  unit:"$/kW",  base:450, bull:280, bear:700 },
+      { key:"windTSA",    label:"Wind TSA",      unit:"$/kW",  base:750, bull:550, bear:1050 },
+      { key:"battCells",  label:"Batt Cells",    unit:"$/kWh", base:150, bull:80,  bear:350 },
+      { key:"solarCF",    label:"Solar CF",       unit:"%",     base:0.27,bull:0.33,bear:0.19 },
+      { key:"windCF",     label:"Wind CF",        unit:"%",     base:0.38,bull:0.48,bear:0.28 },
+      { key:"solarITC",   label:"Solar ITC",      unit:"%",     base:0.30,bull:0.50,bear:0.00 },
+      { key:"windPTC",    label:"Wind PTC",       unit:"$/MWh", base:26,  bull:35,  bear:0 },
+      { key:"wacc",       label:"WACC",            unit:"%",     base:0.08,bull:0.06,bear:0.13 },
+    ],
+    bullLabel: "Cheap renewables + storage, full IRA, great sites",
+    bearLabel: "Expensive equipment, no IRA, poor sites, high rates",
+  },
+  swgb: {
+    label: "Hybrid (Sol+Wind+Gas+Batt)",
+    inputs: [
+      { key:"solarModule",label:"Solar Module",  unit:"$/kW",  base:450, bull:280, bear:700 },
+      { key:"windTSA",    label:"Wind TSA",      unit:"$/kW",  base:750, bull:550, bear:1050 },
+      { key:"gasPrice",   label:"Gas Price",     unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
+      { key:"gasTurbine", label:"GT+HRSG+ST",    unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"battCells",  label:"Batt Cells",    unit:"$/kWh", base:150, bull:80,  bear:350 },
+      { key:"solarITC",   label:"Solar ITC",      unit:"%",     base:0.30,bull:0.50,bear:0.00 },
+      { key:"windPTC",    label:"Wind PTC",       unit:"$/MWh", base:26,  bull:35,  bear:0 },
+      { key:"wacc",       label:"WACC",            unit:"%",     base:0.08,bull:0.06,bear:0.13 },
+    ],
+    bullLabel: "Cheap everything, full IRA, low gas backup cost",
+    bearLabel: "All inputs stressed: expensive capex, high gas, no IRA",
+  },
+};
+
+function crf(r,n){return r===0?1/n:(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
+
+// ============ SIZING: targets 100% reliability ============
+// Oversized so the 72hr dispatch sim never drops load
+function baseSize(p, id) {
+  const L = p.loadMW;
+  const rte = p.batteryRTE;
+  switch(id) {
+    case "sb": return { solarMW:Math.ceil(L*4.8/rte), windMW:0, gasMW:0, battMW:L*1.15, battMWh:L*20/rte, upsMWh:0 };
+    case "wb": return { solarMW:0, windMW:Math.ceil(L*3.5/rte), gasMW:0, battMW:L*1.15, battMWh:L*18/rte, upsMWh:0 };
+    case "gu": return { solarMW:0, windMW:0, gasMW:Math.ceil(L*1.2), battMW:0, battMWh:0, upsMWh:L*0.25 };
+    case "swb": return { solarMW:Math.ceil(L*2.0), windMW:Math.ceil(L*2.2), gasMW:0, battMW:L*1.1, battMWh:L*14/rte, upsMWh:0 };
+    case "swgb": return { solarMW:Math.ceil(L*0.65*0.4/p.solarCF*1.1), windMW:Math.ceil(L*0.65*0.6/p.windCF*1.1), gasMW:Math.ceil(L*0.6), battMW:L*0.35, battMWh:L*0.35*p.batteryDuration, upsMWh:0 };
+    default: return {};
+  }
+}
+
+function gasFrac(id) { return id==="gu"?1:id==="swgb"?0.35:0; }
+
+function computeLCOE(p, sz, id) {
+  const L=p.loadMW, annMWh=L*8760;
+  const sC=p.solarModule+p.solarRacking+p.solarBOP+p.solarInterconnect+p.solarEPC+p.solarSoft;
+  const wC=p.windTSA+p.windFoundation+p.windBOP+p.windInterconnect+p.windEPC+p.windSoft;
+  const gC=p.gasTurbine+p.gasBOP+p.gasPipeline+p.gasElectrical+p.gasSCR+p.gasEPC+p.gasSoft;
+  const bC=p.battCells+p.battBOP+p.battEPC+p.battSite;
+  const CRF=crf(p.wacc,p.life);
+  const gf=gasFrac(id);
+  const gS=sz.solarMW*sC*1000,gW=sz.windMW*wC*1000,gG=sz.gasMW*gC*1000;
+  const gB=sz.battMWh*bC*1000,gU=(sz.upsMWh||0)*p.upsCapex*1000;
+  const iS=gS*p.solarITC,iB=gB*p.battITC;
+  const net=gS+gW+gG+gB+gU-iS-iB;
+  const annC=net*CRF;
+  const annOM=(sz.solarMW*p.solarOM+sz.windMW*p.windOM+sz.gasMW*p.gasOMFixed+(sz.battMW||0)*p.battOM)*1000+gf*annMWh*p.gasOMVar;
+  const annF=gf*annMWh*p.gasPrice*p.heatRate;
+  const annPTC=sz.windMW*p.windCF*8760*p.windPTC*Math.min(10,p.life)/p.life;
+  const lcC=annC/annMWh,lcO=annOM/annMWh,lcF=annF/annMWh,lcP=annPTC/annMWh;
+  const lcoe=lcC+lcO+lcF-lcP;
+  const fp=lcoe>0?lcF/lcoe:0;
+  const p10=lcoe-lcF+lcF*Math.max(0.3,1-1.28*p.gasVol),p90=lcoe-lcF+lcF*(1+1.28*p.gasVol);
+  return { ...sz, netCapex:net, lcoe, lcoeCapex:lcC, lcoeOM:lcO, lcoeFuel:lcF, lcoePTC:lcP, p10, p90, spread:p90-p10, fuelPct:fp,
+    overbuild:(sz.solarMW+sz.windMW+sz.gasMW)/L,
+    capexBreakdown:{solar:gS-iS,wind:gW,gas:gG,battery:gB-iB,ups:gU},
+    gasFrac:gf };
+}
+
+// ============ DISPATCH SIM ============
+function seededRng(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646;};}
+
+function dispatch(p, sz, hours=72) {
+  const L=p.loadMW, rng=seededRng(42);
+  const solarRaw=[], windRaw=[];
+  for(let h=0;h<hours;h++){
+    const hod=h%24;
+    if(hod>=6&&hod<=19){const pk=12.5,sig=3;solarRaw.push(Math.exp(-0.5*Math.pow((hod-pk)/sig,2))*(0.65+0.35*rng()));}
+    else solarRaw.push(0);
+  }
+  const sAvg=solarRaw.reduce((a,b)=>a+b,0)/hours;
+  const sScale=sAvg>0?p.solarCF/sAvg:0;
+
+  let wSt=0.4+0.2*rng();
+  for(let h=0;h<hours;h++){
+    const hod=h%24,diurnal=1+0.15*Math.cos((hod-3)*Math.PI/12);
+    wSt=wSt*0.92+(rng()*0.6+0.2)*0.08;
+    const day=Math.floor(h/24),ev=day===1?0.5:day===2?1.35:1;
+    windRaw.push(Math.max(0,Math.min(1,wSt*diurnal*ev)));
+  }
+  const wAvg=windRaw.reduce((a,b)=>a+b,0)/hours;
+  const wScale=wAvg>0?p.windCF/wAvg:0;
+
+  let soc=(sz.battMWh||0)*0.5;
+  const maxSoc=sz.battMWh||0;
+  const data=[];
+  let totCurt=0,totUnmet=0,totSol=0,totWnd=0,totGas=0,totBD=0;
+
+  for(let h=0;h<hours;h++){
+    const sol=sz.solarMW>0?Math.min(sz.solarMW,sz.solarMW*solarRaw[h]*sScale):0;
+    const wnd=sz.windMW>0?Math.min(sz.windMW,sz.windMW*windRaw[h]*wScale):0;
+    const ren=sol+wnd;
+    let gas=0,bC=0,bD=0,curt=0,unmet=0;
+    const def=L-ren;
+    if(def>0){
+      if(sz.gasMW>0)gas=Math.min(sz.gasMW,def);
+      const rem=def-gas;
+      if(rem>0&&soc>0){bD=Math.min(rem,sz.battMW||0,soc);soc-=bD;}
+      unmet=Math.max(0,rem-bD);
+    } else {
+      const sur=-def;
+      if(soc<maxSoc&&maxSoc>0){bC=Math.min(sur,sz.battMW||0,(maxSoc-soc)/p.batteryRTE);soc+=bC*p.batteryRTE;}
+      curt=sur-bC;
+    }
+    totSol+=sol;totWnd+=wnd;totGas+=gas;totBD+=bD;totCurt+=curt;totUnmet+=unmet;
+    data.push({hour:h,sol,wnd,gas,bD,bC,curt,unmet,soc,load:L});
+  }
+  return {data, stats:{
+    reliability:(1-totUnmet/(L*hours))*100, curtailPct:totCurt/(totSol+totWnd+totGas+.001)*100,
+    maxSoc, peakSol:Math.max(...data.map(d=>d.sol)), peakWnd:Math.max(...data.map(d=>d.wnd)),
+    totUnmet, avgGas:totGas/hours,
+  }};
+}
+
+function tornadoData(p){
+  const vars=[
+    {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas Turbine",u:"$/kW",r:0.5},
+    {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.3},{key:"wacc",label:"WACC",u:"%",r:0.5},
+    {key:"battCells",label:"Batt Cells",u:"$/kWh",r:0.5},{key:"solarModule",label:"Solar Module",u:"$/kW",r:0.4},
+    {key:"windTSA",label:"Wind TSA",u:"$/kW",r:0.4},{key:"solarCF",label:"Solar CF",u:"%",r:0.25},
+    {key:"windCF",label:"Wind CF",u:"%",r:0.25},{key:"solarITC",label:"Solar ITC",u:"%",r:1.0},
+  ];
+  return vars.map(v=>{
+    const lo={...p,[v.key]:p[v.key]*(1-v.r)},hi={...p,[v.key]:p[v.key]*(1+v.r)};
+    const loR={},hiR={};
+    SCEN.forEach(s=>{loR[s.id]=computeLCOE(lo,baseSize(lo,s.id),s.id);hiR[s.id]=computeLCOE(hi,baseSize(hi,s.id),s.id);});
+    return{...v,loVal:lo[v.key],hiVal:hi[v.key],loR,hiR};
+  });
+}
+
+function fmt$(v){return v>=1e9?`$${(v/1e9).toFixed(1)}B`:v>=1e6?`$${(v/1e6).toFixed(0)}M`:`$${(v/1e3).toFixed(0)}K`;}
+const F={m:"'DM Mono',monospace",s:"'DM Sans',sans-serif"};
+
+function Sl({label,value,onChange,min,max,step,unit=""}){
+  return(<div style={{marginBottom:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
+      <span style={{fontSize:10,color:"#8B95A5",fontFamily:F.m}}>{label}</span>
+      <span style={{fontSize:11,color:"#E8E6E1",fontWeight:600,fontFamily:F.m}}>
+        {typeof value==="number"&&value<1&&(unit==="%")&&value>0?(value*100).toFixed(1):value}{unit}
+      </span>
+    </div>
+    <input type="range" min={min} max={max} step={step} value={value}
+      onChange={e=>onChange(parseFloat(e.target.value))} style={{width:"100%",height:2,accentColor:"#D4A026"}}/>
+  </div>);
+}
+
+function CxP({title,items,p,update,color}){
+  const total=items.reduce((s,i)=>s+p[i.key],0);
+  return(<div style={{background:"#12151C",border:"1px solid #1E2330",borderRadius:5,padding:12,marginBottom:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+      <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color,fontFamily:F.m}}>{title}</span>
+      <span style={{fontSize:11,fontWeight:700,color:"#E8E6E1",fontFamily:F.m}}>${total}/kW</span>
+    </div>
+    <div style={{display:"flex",height:6,borderRadius:3,overflow:"hidden",marginBottom:8}}>
+      {items.map((it,i)=>(<div key={it.key} style={{width:`${(p[it.key]/total)*100}%`,background:color,opacity:0.4+(i*0.12),minWidth:1}} title={`${it.label}: $${p[it.key]}`}/>))}
+    </div>
+    {items.map(it=>(<Sl key={it.key} label={it.label} value={p[it.key]} onChange={v=>update(it.key,v)} min={it.min} max={it.max} step={it.step} unit={` ${it.unit}`}/>))}
+  </div>);
+}
+
+// ============ PROFILE CHART ============
+function PChart({profile,p,height=220}){
+  const{data,stats}=profile;
+  const W=720,H=height,PD={t:16,r:12,b:32,l:48};
+  const cw=W-PD.l-PD.r,ch=H-PD.t-PD.b;
+  const hrs=data.length, L=p.loadMW;
+  const maxGen=Math.max(L*1.4,Math.max(...data.map(d=>d.sol+d.wnd+d.gas+d.bD))*1.1);
+  const x=h=>PD.l+(h/(hrs-1))*cw, y=v=>PD.t+ch-(v/maxGen)*ch;
+  const layers=[{k:"gas",color:"#C24B4B"},{k:"wnd",color:"#3D7EC7"},{k:"sol",color:"#D4A026"},{k:"bD",color:"#2D8C6F"}].filter(l=>data.some(d=>d[l.k]>0));
+  const stk=data.map(d=>{let c=0;const v={};layers.forEach(l=>{v[l.k+"_b"]=c;c+=d[l.k];v[l.k+"_t"]=c;});return v;});
+  function ap(tk,bk){let p="";for(let i=0;i<hrs;i++)p+=(i===0?"M":"L")+`${x(i).toFixed(1)},${y(stk[i][tk]).toFixed(1)}`;for(let i=hrs-1;i>=0;i--)p+=`L${x(i).toFixed(1)},${y(stk[i][bk]).toFixed(1)}`;return p+"Z";}
+  return(
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto"}}>
+      {[0,.25,.5,.75,1].map(f=><g key={f}><line x1={PD.l} x2={W-PD.r} y1={y(maxGen*f)} y2={y(maxGen*f)} stroke="#1E2330" strokeWidth={.5}/><text x={PD.l-4} y={y(maxGen*f)+3} textAnchor="end" fill="#6B7280" fontSize={7} fontFamily={F.m}>{(maxGen*f/1000).toFixed(1)}GW</text></g>)}
+      {[24,48].filter(h=>h<hrs).map(h=><line key={h} x1={x(h)} x2={x(h)} y1={PD.t} y2={H-PD.b} stroke="#2A3040" strokeWidth={1} strokeDasharray="3,3"/>)}
+      {Array.from({length:7},(_,i)=>i*12).filter(h=>h<hrs).map(h=><text key={h} x={x(h)} y={H-PD.b+12} textAnchor="middle" fill="#6B7280" fontSize={7} fontFamily={F.m}>{h%24===0?`Day${Math.floor(h/24)+1}`:`${h%24}:00`}</text>)}
+      {layers.map(l=><path key={l.k} d={ap(l.k+"_t",l.k+"_b")} fill={l.color} fillOpacity={.5}/>)}
+      {data.map((d,i)=>d.curt>0?<rect key={`c${i}`} x={x(i)-1.5} y={y(L)-(d.curt/maxGen)*ch} width={3} height={(d.curt/maxGen)*ch} fill="#E74C3C" fillOpacity={.25}/>:null)}
+      {data.map((d,i)=>d.unmet>0?<rect key={`u${i}`} x={x(i)-1.5} y={y(L)} width={3} height={(d.unmet/maxGen)*ch} fill="#FFD700" fillOpacity={.6}/>:null)}
+      <line x1={PD.l} x2={W-PD.r} y1={y(L)} y2={y(L)} stroke="#E8E6E1" strokeWidth={1.5} strokeDasharray="6,3"/>
+      <text x={W-PD.r+2} y={y(L)+3} fill="#E8E6E1" fontSize={7} fontFamily={F.m}>LOAD</text>
+      {layers.map((l,i)=><g key={l.k} transform={`translate(${PD.l+i*90},${H-6})`}><rect x={0} y={-4} width={6} height={6} fill={l.color} rx={1}/><text x={9} y={2} fill="#9CA3AF" fontSize={7} fontFamily={F.m}>{l.k==="bD"?"Batt":l.k==="sol"?"Solar":l.k==="wnd"?"Wind":"Gas"}</text></g>)}
+    </svg>
+  );
+}
+
+// ============ SLD COMPONENT ============
+function SLD({configId, sz, p}) {
+  const L = p.loadMW;
+  const W = 740, H = 380;
+  const hasSolar = sz.solarMW > 0, hasWind = sz.windMW > 0, hasGas = sz.gasMW > 0, hasBatt = (sz.battMW||0) > 0;
+  const sources = [hasSolar&&"solar", hasWind&&"wind", hasGas&&"gas", hasBatt&&"battery"].filter(Boolean);
+  const n = sources.length;
+
+  // Standard symbol helpers
+  const gen = (cx, cy, r=14) => (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+      <path d={`M${cx-7},${cy} Q${cx-3.5},${cy-6} ${cx},${cy} Q${cx+3.5},${cy+6} ${cx+7},${cy}`} fill="none" stroke="#E8E6E1" strokeWidth={1.2}/>
+    </g>
+  );
+  const xfmr = (cx, cy, r=10) => (
+    <g>
+      <circle cx={cx-r*0.55} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+      <circle cx={cx+r*0.55} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+    </g>
+  );
+  const brk = (cx, cy, sz=5) => (
+    <rect x={cx-sz} y={cy-sz} width={sz*2} height={sz*2} fill="#1E2330" stroke="#E8E6E1" strokeWidth={1.2}/>
+  );
+  const bus = (x1, x2, cy, color="#E8E6E1") => (
+    <line x1={x1} x2={x2} y1={cy} y2={cy} stroke={color} strokeWidth={3}/>
+  );
+  const wire = (x1, y1, x2, y2, dash=false) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9CA3AF" strokeWidth={1} strokeDasharray={dash?"3,3":"none"}/>
+  );
+  const lbl = (x, y, text, sz=8, color="#9CA3AF") => (
+    <text x={x} y={y} fill={color} fontSize={sz} fontFamily={F.m} textAnchor="middle">{text}</text>
+  );
+  const invSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-10} y={cy-8} width={20} height={16} fill="none" stroke="#E8E6E1" strokeWidth={1.2} rx={2}/>
+      <text x={cx} y={cy+3} fill="#E8E6E1" fontSize={7} fontFamily={F.m} textAnchor="middle">INV</text>
+    </g>
+  );
+  const pcsSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-10} y={cy-8} width={20} height={16} fill="none" stroke="#2D8C6F" strokeWidth={1.2} rx={2}/>
+      <text x={cx} y={cy+3} fill="#2D8C6F" fontSize={7} fontFamily={F.m} textAnchor="middle">PCS</text>
+    </g>
+  );
+  const battSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-12} y={cy-8} width={24} height={16} fill="#2D8C6F" fillOpacity={0.15} stroke="#2D8C6F" strokeWidth={1.5} rx={3}/>
+      <line x1={cx-5} y1={cy-4} x2={cx-5} y2={cy+4} stroke="#2D8C6F" strokeWidth={2}/>
+      <line x1={cx} y1={cy-3} x2={cx} y2={cy+3} stroke="#2D8C6F" strokeWidth={1}/>
+      <line x1={cx+5} y1={cy-4} x2={cx+5} y2={cy+4} stroke="#2D8C6F" strokeWidth={2}/>
+    </g>
+  );
+
+  // Layout: sources spread vertically on left, HV bus center-right, data center far right
+  const hvBusX = 480, hvBusTop = 40, hvBusBot = H - 60;
+  const dcX = 660, dcY = H/2;
+  const sourceSpacing = Math.min(80, (H-80)/Math.max(n,1));
+  const sourceStartY = H/2 - (n-1)*sourceSpacing/2;
+
+  const sourceConfigs = sources.map((src, i) => {
+    const cy = sourceStartY + i * sourceSpacing;
+    const color = src==="solar"?"#D4A026":src==="wind"?"#3D7EC7":src==="gas"?"#C24B4B":"#2D8C6F";
+    const mw = src==="solar"?sz.solarMW:src==="wind"?sz.windMW:src==="gas"?sz.gasMW:(sz.battMW||0);
+    const mvKV = src==="solar"?"34.5 kV":src==="wind"?"34.5 kV":src==="gas"?"13.8 kV":"34.5 kV";
+    return { src, cy, color, mw, mvKV };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
+      <defs>
+        <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+          <polygon points="0 0, 6 2, 0 4" fill="#9CA3AF"/>
+        </marker>
+      </defs>
+
+      {/* Title */}
+      {lbl(W/2, 18, `SINGLE LINE DIAGRAM`, 10, "#6B7280")}
+
+      {/* HV Bus (vertical) */}
+      <line x1={hvBusX} y1={hvBusTop} x2={hvBusX} y2={hvBusBot} stroke="#E8A838" strokeWidth={4}/>
+      {lbl(hvBusX, hvBusTop-6, "HV BUS", 8, "#E8A838")}
+      {lbl(hvBusX, hvBusTop+14, configId==="gu"?"13.8 kV":"138 kV", 7, "#E8A838")}
+
+      {/* Each source branch */}
+      {sourceConfigs.map(({ src, cy, color, mw, mvKV }, idx) => {
+        const genX = 40, invX = 120, mvBusX = 200, xfmrX = 310, brkX = 400;
+
+        return (
+          <g key={src}>
+            {/* Source icon + label */}
+            {src === "solar" && (
+              <g>
+                <rect x={genX-14} y={cy-12} width={28} height={24} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={1.2} rx={2}/>
+                <text x={genX} y={cy-1} fill={color} fontSize={10} fontFamily={F.m} textAnchor="middle">PV</text>
+                <text x={genX} y={cy+10} fill={color} fontSize={6} fontFamily={F.m} textAnchor="middle">{mw}MW</text>
+                {wire(genX+14, cy, invX-10, cy)}
+                {invSymbol(invX, cy)}
+                {wire(invX+10, cy, mvBusX-20, cy)}
+                {lbl(invX, cy-14, "DC/AC", 6)}
+              </g>
+            )}
+            {src === "wind" && (
+              <g>
+                {gen(genX, cy)}
+                <text x={genX} y={cy+26} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">WTG {mw}MW</text>
+                {wire(genX+14, cy, mvBusX-20, cy)}
+              </g>
+            )}
+            {src === "gas" && (
+              <g>
+                {gen(genX, cy)}
+                <text x={genX} y={cy+26} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">GT/ST {mw}MW</text>
+                {wire(genX+14, cy, mvBusX-20, cy)}
+                {lbl((genX+14+mvBusX-20)/2, cy-10, "13.8 kV", 6)}
+              </g>
+            )}
+            {src === "battery" && (
+              <g>
+                {battSymbol(genX, cy)}
+                <text x={genX} y={cy+20} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">BESS {mw}MW</text>
+                <text x={genX} y={cy+28} fill={color} fontSize={6} fontFamily={F.m} textAnchor="middle">{((sz.battMWh||0)/1000).toFixed(1)}GWh</text>
+                {wire(genX+12, cy, invX-10, cy)}
+                {pcsSymbol(invX, cy)}
+                {wire(invX+10, cy, mvBusX-20, cy)}
+              </g>
+            )}
+
+            {/* MV Collection Bus (short horizontal) */}
+            {bus(mvBusX-20, mvBusX+20, cy, color+"AA")}
+            {lbl(mvBusX, cy+16, mvKV, 6, color)}
+
+            {/* Step-up Xfmr */}
+            {wire(mvBusX+20, cy, xfmrX-12, cy)}
+            {xfmr(xfmrX, cy)}
+            {lbl(xfmrX, cy-16, src==="gas"?"GSU":"SSU", 6)}
+
+            {/* Breaker */}
+            {wire(xfmrX+12, cy, brkX-5, cy)}
+            {brk(brkX, cy)}
+
+            {/* Connect to HV bus */}
+            {wire(brkX+5, cy, hvBusX, cy)}
+
+            {/* Breaker label */}
+            {lbl(brkX, cy-10, "CB", 6)}
+          </g>
+        );
+      })}
+
+      {/* HV Bus to Data Center */}
+      {wire(hvBusX, dcY, 540, dcY)}
+      {xfmr(555, dcY, 12)}
+      {lbl(555, dcY-18, "STEP-DOWN", 6)}
+      {wire(568, dcY, 600, dcY)}
+      {brk(610, dcY, 6)}
+      {lbl(610, dcY-12, "MAIN BKR", 6)}
+      {wire(616, dcY, dcX-20, dcY)}
+
+      {/* Data Center Load */}
+      <rect x={dcX-20} y={dcY-25} width={60} height={50} fill="#1E2330" stroke="#E8E6E1" strokeWidth={1.5} rx={4}/>
+      <text x={dcX+10} y={dcY-6} fill="#E8E6E1" fontSize={8} fontFamily={F.m} textAnchor="middle">DATA</text>
+      <text x={dcX+10} y={dcY+4} fill="#E8E6E1" fontSize={8} fontFamily={F.m} textAnchor="middle">CENTER</text>
+      <text x={dcX+10} y={dcY+16} fill="#6B7280" fontSize={7} fontFamily={F.m} textAnchor="middle">{L} MW</text>
+
+      {/* Voltage labels on DC side */}
+      {lbl(590, dcY+20, "MV SWGR", 6)}
+      {lbl(590, dcY+28, "12.47 kV", 6)}
+    </svg>
+  );
+}
+
+
+// ============ MAIN APP ============
+export default function App() {
+  const [p, setP] = useState(DEF);
+  const [tab, setTab] = useState("overview");
+  const [torCfg, setTorCfg] = useState("gu");
+  const [profCfg, setProfCfg] = useState("swgb");
+  const [sldCfg, setSldCfg] = useState("swgb");
+  // Reliability adjusters: delta MW/MWh per config
+  const [relAdj, setRelAdj] = useState(() => {
+    const o = {};
+    SCEN.forEach(s => { o[s.id] = { dSolar: 0, dWind: 0, dGas: 0, dBattMW: 0, dBattMWh: 0 }; });
+    return o;
+  });
+  const update = useCallback((k,v) => setP(prev=>({...prev,[k]:v})), []);
+  const updateRel = useCallback((cfgId, key, val) => {
+    setRelAdj(prev => ({ ...prev, [cfgId]: { ...prev[cfgId], [key]: val } }));
+  }, []);
+
+  // Compute base sizes + adjusted sizes + LCOE + dispatch
+  const computed = useMemo(() => {
+    const out = {};
+    SCEN.forEach(s => {
+      const bs = baseSize(p, s.id);
+      const adj = relAdj[s.id];
+      const sz = {
+        solarMW: Math.max(0, bs.solarMW + adj.dSolar),
+        windMW: Math.max(0, bs.windMW + adj.dWind),
+        gasMW: Math.max(0, bs.gasMW + adj.dGas),
+        battMW: Math.max(0, (bs.battMW||0) + adj.dBattMW),
+        battMWh: Math.max(0, (bs.battMWh||0) + adj.dBattMWh),
+        upsMWh: bs.upsMWh || 0,
+      };
+      const lcoe = computeLCOE(p, sz, s.id);
+      const disp = dispatch(p, sz);
+      out[s.id] = { base: bs, sz, lcoe, disp };
+    });
+    return out;
+  }, [p, relAdj]);
+
+  const tornado = useMemo(() => tornadoData(p), [p]);
+  // Per-config scenario blend: 0 = bear, 0.5 = base, 1.0 = bull
+  // And per-input overrides
+  const [scenCfg, setScenCfg] = useState("gu");
+  const [scenBlends, setScenBlends] = useState(() => {
+    const o = {};
+    SCEN.forEach(s => { o[s.id] = {}; }); // empty = use blend slider
+    return o;
+  });
+  const [blendSlider, setBlendSlider] = useState(() => {
+    const o = {};
+    SCEN.forEach(s => { o[s.id] = 0.5; }); // 0.5 = base
+    return o;
+  });
+
+  // Compute scenario LCOE for a given config at a given blend level or with overrides
+  const scenarioResults = useMemo(() => {
+    const out = {};
+    SCEN.forEach(s => {
+      const si = SCENARIO_INPUTS[s.id];
+      if (!si) return;
+      const cases = {};
+      // Compute for bull, base, bear, and custom (current blend)
+      ["bull", "base", "bear", "custom"].forEach(caseType => {
+        const merged = { ...p };
+        si.inputs.forEach(inp => {
+          if (caseType === "bull") merged[inp.key] = inp.bull;
+          else if (caseType === "bear") merged[inp.key] = inp.bear;
+          else if (caseType === "base") merged[inp.key] = inp.base;
+          else {
+            // Custom: use per-input override if set, otherwise interpolate from blend
+            const override = scenBlends[s.id][inp.key];
+            if (override !== undefined) {
+              merged[inp.key] = override;
+            } else {
+              const bl = blendSlider[s.id];
+              // bl: 0=bear, 0.5=base, 1=bull
+              if (bl <= 0.5) {
+                const t = bl / 0.5; // 0..1 from bear to base
+                merged[inp.key] = inp.bear + (inp.base - inp.bear) * t;
+              } else {
+                const t = (bl - 0.5) / 0.5; // 0..1 from base to bull
+                merged[inp.key] = inp.base + (inp.bull - inp.base) * t;
+              }
+            }
+          }
+        });
+        const sz = baseSize(merged, s.id);
+        cases[caseType] = computeLCOE(merged, sz, s.id);
+        cases[caseType + "Params"] = { ...merged };
+      });
+      out[s.id] = cases;
+    });
+    return out;
+  }, [p, scenBlends, blendSlider]);
+
+  const results = useMemo(() => {
+    const o = {};
+    SCEN.forEach(s => { o[s.id] = computed[s.id].lcoe; });
+    return o;
+  }, [computed]);
+
+  const maxLcoe = Math.max(...Object.values(results).map(r=>r.p90||r.lcoe))*1.08;
+  const PS={background:"#12151C",border:"1px solid #1E2330",borderRadius:5,padding:14};
+  const SL={fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#6B7280",fontFamily:F.m,marginBottom:10};
+  const TS=(a)=>({padding:"5px 12px",fontSize:10,fontFamily:F.m,background:a?"#1E2330":"transparent",color:a?"#E8E6E1":"#6B7280",border:a?"1px solid #2A3040":"1px solid transparent",borderRadius:3,cursor:"pointer"});
+
+  return (
+    <div style={{fontFamily:F.s,background:"#0C0F14",color:"#E8E6E1",minHeight:"100vh",padding:"20px 16px"}}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+      <div style={{marginBottom:20,borderBottom:"1px solid #1E2330",paddingBottom:12}}>
+        <h1 style={{fontSize:16,fontWeight:700,letterSpacing:"-0.02em",color:"#F0EDE8",margin:0,fontFamily:F.m}}>LCOE SIMULATOR v4</h1>
+        <div style={{fontSize:10,color:"#6B7280",marginTop:3,fontFamily:F.m}}>1 GW DC {"\u00B7"} 100% reliability baseline {"\u00B7"} redundancy tuning {"\u00B7"} single-line diagrams</div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:16}}>
+        {/* LEFT */}
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"calc(100vh - 100px)",overflowY:"auto",paddingRight:4}}>
+          <CxP title="SOLAR" color="#D4A026" p={p} update={update} items={[
+            {key:"solarModule",label:"Module+Inv",min:200,max:800,step:10,unit:"$/kW"},
+            {key:"solarBOP",label:"BOP",min:80,max:400,step:10,unit:"$/kW"},
+            {key:"solarInterconnect",label:"Interconnect",min:20,max:200,step:10,unit:"$/kW"},
+            {key:"solarEPC",label:"EPC+Soft",min:30,max:250,step:5,unit:"$/kW"},
+          ]}/>
+          <CxP title="WIND" color="#3D7EC7" p={p} update={update} items={[
+            {key:"windTSA",label:"Turbine TSA",min:400,max:1200,step:25,unit:"$/kW"},
+            {key:"windBOP",label:"BOP+Civil",min:100,max:500,step:10,unit:"$/kW"},
+            {key:"windInterconnect",label:"Interconnect",min:40,max:300,step:10,unit:"$/kW"},
+            {key:"windEPC",label:"EPC+Soft",min:50,max:350,step:10,unit:"$/kW"},
+          ]}/>
+          <CxP title="GAS CC" color="#C24B4B" p={p} update={update} items={[
+            {key:"gasTurbine",label:"GT+HRSG+ST",min:300,max:2000,step:25,unit:"$/kW"},
+            {key:"gasBOP",label:"BOP (all)",min:50,max:800,step:10,unit:"$/kW"},
+            {key:"gasPipeline",label:"Gas Lateral",min:10,max:400,step:10,unit:"$/kW"},
+            {key:"gasEPC",label:"EPC+Permit",min:30,max:500,step:10,unit:"$/kW"},
+          ]}/>
+          <CxP title="BATTERY" color="#2D8C6F" p={p} update={update} items={[
+            {key:"battCells",label:"LFP Cells",min:50,max:400,step:10,unit:"$/kWh"},
+            {key:"battBOP",label:"PCS/BOP",min:30,max:200,step:5,unit:"$/kWh"},
+            {key:"battEPC",label:"EPC+Site",min:15,max:150,step:5,unit:"$/kWh"},
+          ]}/>
+          <div style={PS}>
+            <div style={SL}>PERFORMANCE</div>
+            <Sl label="Solar CF" value={p.solarCF} onChange={v=>update("solarCF",v)} min={0.15} max={0.35} step={0.01} unit="%"/>
+            <Sl label="Wind CF" value={p.windCF} onChange={v=>update("windCF",v)} min={0.25} max={0.55} step={0.01} unit="%"/>
+            <Sl label="Gas Price" value={p.gasPrice} onChange={v=>update("gasPrice",v)} min={1.5} max={12} step={0.25} unit=" $/MMBtu"/>
+            <Sl label="Heat Rate" value={p.heatRate} onChange={v=>update("heatRate",v)} min={5.5} max={10} step={0.1} unit=" MMBtu/MWh"/>
+            <Sl label="Batt Dur" value={p.batteryDuration} onChange={v=>update("batteryDuration",v)} min={2} max={12} step={1} unit=" hr"/>
+            <Sl label="WACC" value={p.wacc} onChange={v=>update("wacc",v)} min={0.04} max={0.16} step={0.005} unit="%"/>
+            <Sl label="Solar ITC" value={p.solarITC} onChange={v=>update("solarITC",v)} min={0} max={0.50} step={0.05} unit="%"/>
+            <Sl label="Wind PTC" value={p.windPTC} onChange={v=>update("windPTC",v)} min={0} max={35} step={1} unit=" $/MWh"/>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+            {["overview","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"].map(t=>(
+              <button key={t} style={TS(tab===t)} onClick={()=>setTab(t)}>{t.toUpperCase()}</button>
+            ))}
+          </div>
+
+          {/* ===== OVERVIEW ===== */}
+          {tab==="overview"&&(<>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+              {SCEN.map(s=>{const r=results[s.id],d=computed[s.id].disp.stats;return(
+                <div key={s.id} style={{...PS,padding:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}><div style={{width:7,height:7,borderRadius:2,background:s.color}}/><span style={{fontSize:9,fontFamily:F.m,color:"#9CA3AF"}}>{s.short}</span></div>
+                  <div style={{fontSize:9,color:"#6B7280",fontFamily:F.m}}>LCOE</div>
+                  <div style={{fontSize:22,fontWeight:700,fontFamily:F.m,color:s.color,lineHeight:1}}>${r.lcoe.toFixed(1)}</div>
+                  <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m}}>/MWh</div>
+                  <div style={{marginTop:8,fontSize:8,color:"#6B7280",fontFamily:F.m,lineHeight:1.6}}>
+                    <div>capex: {fmt$(r.netCapex)}</div>
+                    <div>reliability: <span style={{color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</span></div>
+                    <div>spread: ${r.spread.toFixed(1)}/MWh</div>
+                  </div>
+                </div>
+              );})}
+            </div>
+            <div style={PS}>
+              <div style={SL}>LCOE WITH P10/P90 GAS RISK BAND</div>
+              {SCEN.map(s=>{const r=results[s.id];return(
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:36,fontSize:9,fontFamily:F.m,color:"#9CA3AF",textAlign:"right",flexShrink:0}}>{s.short}</div>
+                  <div style={{flex:1,position:"relative",height:22}}>
+                    {r.spread>0.1&&<div style={{position:"absolute",left:`${(r.p10/maxLcoe)*100}%`,width:`${((r.p90-r.p10)/maxLcoe)*100}%`,height:22,background:s.color+"15",border:`1px dashed ${s.color}40`,borderRadius:2,top:0}}/>}
+                    <div style={{position:"absolute",left:0,width:`${(r.lcoe/maxLcoe)*100}%`,height:22,background:`linear-gradient(90deg,${s.color}CC,${s.color}88)`,borderRadius:2,display:"flex",alignItems:"center",paddingLeft:6,top:0}}>
+                      <span style={{fontSize:10,fontFamily:F.m,color:"#fff",fontWeight:600}}>${r.lcoe.toFixed(1)}</span>
+                    </div>
+                    {r.spread>0.1&&<div style={{position:"absolute",left:`${(r.p90/maxLcoe)*100}%`,top:2,fontSize:7,color:s.color,fontFamily:F.m,transform:"translateX(3px)"}}>P90:${r.p90.toFixed(0)}</div>}
+                  </div>
+                </div>);})}
+            </div>
+          </>)}
+
+          {/* ===== BREAKDOWN ===== */}
+          {tab==="breakdown"&&(
+            <div style={PS}>
+              <div style={SL}>LCOE COMPONENT BREAKDOWN ($/MWh)</div>
+              {SCEN.map(s=>{const r=results[s.id],t=r.lcoe;if(t<=0)return null;
+                const cp=(r.lcoeCapex/t)*100,om=(r.lcoeOM/t)*100,fu=(r.lcoeFuel/t)*100,pt=(r.lcoePTC/t)*100;
+                return(<div key={s.id} style={{marginBottom:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:11,fontFamily:F.m,color:s.color}}>{s.short}</span>
+                    <span style={{fontSize:11,fontFamily:F.m,color:"#9CA3AF"}}>${t.toFixed(1)}/MWh</span>
+                  </div>
+                  <div style={{display:"flex",borderRadius:3,overflow:"hidden"}}>
+                    {cp>0.5&&<div style={{width:`${cp}%`,height:28,backgroundColor:"#4A6FA5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontFamily:F.m,color:"#fff"}}>{cp>10?"CAPEX":""}</div>}
+                    {om>0.5&&<div style={{width:`${om}%`,height:28,backgroundColor:"#6B8E7B",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontFamily:F.m,color:"#fff"}}>{om>10?"O&M":""}</div>}
+                    {fu>0.5&&<div style={{width:`${fu}%`,height:28,backgroundColor:"#C75B3A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontFamily:F.m,color:"#fff"}}>{fu>10?"FUEL":""}</div>}
+                    {pt>0.5&&<div style={{width:`${Math.min(pt,15)}%`,height:28,backgroundColor:"#2D8C6F",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontFamily:F.m,color:"#fff"}}>{pt>8?"PTC":""}</div>}
+                  </div>
+                  <div style={{display:"flex",gap:12,marginTop:4,fontSize:9,fontFamily:F.m,color:"#6B7280"}}>
+                    <span>capex: ${r.lcoeCapex.toFixed(1)}</span><span>o&m: ${r.lcoeOM.toFixed(1)}</span>
+                    {r.lcoeFuel>0&&<span>fuel: ${r.lcoeFuel.toFixed(1)}</span>}
+                    {r.lcoePTC>0&&<span style={{color:"#2D8C6F"}}>ptc: -${r.lcoePTC.toFixed(1)}</span>}
+                  </div>
+                </div>);})}
+              <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid #1E2330"}}>
+                {[{c:"#4A6FA5",l:"Capital"},{c:"#6B8E7B",l:"O&M"},{c:"#C75B3A",l:"Fuel"},{c:"#2D8C6F",l:"PTC"}].map(x=>(
+                  <div key={x.l} style={{display:"flex",alignItems:"center",gap:4,fontSize:9,color:"#6B7280",fontFamily:F.m}}>
+                    <div style={{width:8,height:8,borderRadius:1,background:x.c}}/>{x.l}
+                  </div>))}
+              </div>
+            </div>
+          )}
+
+          {/* ===== RELIABILITY ===== */}
+          {tab==="reliability"&&(<>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+              {SCEN.map(s=>{const d=computed[s.id].disp.stats;
+                const rColor=d.reliability>=99.99?"#2D8C6F":d.reliability>=99?"#E8A838":"#C24B4B";
+                return(<div key={s.id} style={{...PS,padding:10,borderColor:rColor+"40"}}>
+                  <div style={{fontSize:9,fontFamily:F.m,color:s.color,fontWeight:600,marginBottom:4}}>{s.short}</div>
+                  <div style={{fontSize:24,fontWeight:700,fontFamily:F.m,color:rColor,lineHeight:1}}>{d.reliability.toFixed(2)}%</div>
+                  <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m}}>reliability</div>
+                  <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginTop:4}}>curtail: {d.curtailPct.toFixed(1)}%</div>
+                  <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m}}>unmet: {d.totUnmet.toFixed(0)} MWh</div>
+                </div>);})}
+            </div>
+
+            <div style={PS}>
+              <div style={SL}>REDUNDANCY ADJUSTER {"\u2014"} ADD/REMOVE CAPACITY PER CONFIG</div>
+              <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:12}}>Base sizing targets 100% reliability. Remove capacity to see how reliability degrades and LCOE drops. Add to increase margin.</div>
+              {SCEN.map(s => {
+                const bs = computed[s.id].base;
+                const adj = relAdj[s.id];
+                const d = computed[s.id].disp.stats;
+                const r = results[s.id];
+                const rColor = d.reliability >= 99.99 ? "#2D8C6F" : d.reliability >= 99 ? "#E8A838" : "#C24B4B";
+
+                return (
+                  <div key={s.id} style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #1E2330" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontFamily: F.m, color: s.color, fontWeight: 600 }}>{s.short}</span>
+                      <div style={{ display: "flex", gap: 16, fontSize: 9, fontFamily: F.m }}>
+                        <span style={{ color: rColor }}>{d.reliability.toFixed(2)}% reliable</span>
+                        <span style={{ color: "#9CA3AF" }}>${r.lcoe.toFixed(1)}/MWh</span>
+                        <span style={{ color: "#9CA3AF" }}>{fmt$(r.netCapex)}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                      {bs.solarMW > 0 && (
+                        <div>
+                          <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>Solar {"\u0394"}MW (base: {bs.solarMW})</div>
+                          <input type="range" min={-Math.floor(bs.solarMW * 0.5)} max={Math.ceil(bs.solarMW * 0.3)} step={50}
+                            value={adj.dSolar} onChange={e => updateRel(s.id, "dSolar", parseInt(e.target.value))}
+                            style={{ width: "100%", height: 2, accentColor: "#D4A026" }} />
+                          <div style={{ fontSize: 9, fontFamily: F.m, color: adj.dSolar === 0 ? "#6B7280" : adj.dSolar > 0 ? "#2D8C6F" : "#C24B4B" }}>
+                            {adj.dSolar >= 0 ? "+" : ""}{adj.dSolar} MW
+                          </div>
+                        </div>
+                      )}
+                      {bs.windMW > 0 && (
+                        <div>
+                          <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>Wind {"\u0394"}MW (base: {bs.windMW})</div>
+                          <input type="range" min={-Math.floor(bs.windMW * 0.5)} max={Math.ceil(bs.windMW * 0.3)} step={50}
+                            value={adj.dWind} onChange={e => updateRel(s.id, "dWind", parseInt(e.target.value))}
+                            style={{ width: "100%", height: 2, accentColor: "#3D7EC7" }} />
+                          <div style={{ fontSize: 9, fontFamily: F.m, color: adj.dWind === 0 ? "#6B7280" : adj.dWind > 0 ? "#2D8C6F" : "#C24B4B" }}>
+                            {adj.dWind >= 0 ? "+" : ""}{adj.dWind} MW
+                          </div>
+                        </div>
+                      )}
+                      {bs.gasMW > 0 && (
+                        <div>
+                          <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>Gas {"\u0394"}MW (base: {bs.gasMW})</div>
+                          <input type="range" min={-Math.floor(bs.gasMW * 0.5)} max={Math.ceil(bs.gasMW * 0.3)} step={50}
+                            value={adj.dGas} onChange={e => updateRel(s.id, "dGas", parseInt(e.target.value))}
+                            style={{ width: "100%", height: 2, accentColor: "#C24B4B" }} />
+                          <div style={{ fontSize: 9, fontFamily: F.m, color: adj.dGas === 0 ? "#6B7280" : adj.dGas > 0 ? "#2D8C6F" : "#C24B4B" }}>
+                            {adj.dGas >= 0 ? "+" : ""}{adj.dGas} MW
+                          </div>
+                        </div>
+                      )}
+                      {(bs.battMW || 0) > 0 && (
+                        <div>
+                          <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>Batt {"\u0394"}MW (base: {bs.battMW})</div>
+                          <input type="range" min={-Math.floor(bs.battMW * 0.5)} max={Math.ceil(bs.battMW * 0.3)} step={50}
+                            value={adj.dBattMW} onChange={e => updateRel(s.id, "dBattMW", parseInt(e.target.value))}
+                            style={{ width: "100%", height: 2, accentColor: "#2D8C6F" }} />
+                          <div style={{ fontSize: 9, fontFamily: F.m, color: adj.dBattMW === 0 ? "#6B7280" : adj.dBattMW > 0 ? "#2D8C6F" : "#C24B4B" }}>
+                            {adj.dBattMW >= 0 ? "+" : ""}{adj.dBattMW} MW
+                          </div>
+                        </div>
+                      )}
+                      {(bs.battMWh || 0) > 0 && (
+                        <div>
+                          <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>Batt {"\u0394"}GWh (base: {(bs.battMWh / 1000).toFixed(1)})</div>
+                          <input type="range" min={-Math.floor(bs.battMWh * 0.4)} max={Math.ceil(bs.battMWh * 0.3)} step={500}
+                            value={adj.dBattMWh} onChange={e => updateRel(s.id, "dBattMWh", parseInt(e.target.value))}
+                            style={{ width: "100%", height: 2, accentColor: "#2D8C6F" }} />
+                          <div style={{ fontSize: 9, fontFamily: F.m, color: adj.dBattMWh === 0 ? "#6B7280" : adj.dBattMWh > 0 ? "#2D8C6F" : "#C24B4B" }}>
+                            {adj.dBattMWh >= 0 ? "+" : ""}{(adj.dBattMWh / 1000).toFixed(1)} GWh
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ ...PS, borderColor: "#2A3040" }}>
+              <div style={SL}>RELIABILITY INSIGHT</div>
+              <div style={{ fontSize: 11, lineHeight: 1.7, color: "#D1D5DB" }}>
+                {(() => {
+                  const costs = SCEN.map(s => ({ short: s.short, color: s.color, lcoe: results[s.id].lcoe, rel: computed[s.id].disp.stats.reliability }));
+                  const cheapest = costs.reduce((a, b) => a.lcoe < b.lcoe ? a : b);
+                  const mostReliable = costs.reduce((a, b) => a.rel > b.rel ? a : b);
+                  return (
+                    <>
+                      All configs sized for 100% reliability baseline. Drag sliders left to strip capacity and watch reliability degrade {"\u2014"} this reveals each config's
+                      reliability margin. <span style={{ color: "#C24B4B" }}>Gas</span> has N+1 turbine redundancy built in. <span style={{ color: "#D4A026" }}>Solar+Batt</span> needs
+                      massive storage to cover multi-day cloud events. The yellow bars in the PROFILES tab show unmet load when you undersize. The cost of 100% reliability
+                      vs. 99% reliability is the marginal cost of that last unit of storage or generation.
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </>)}
+
+          {/* ===== PROFILES ===== */}
+          {tab==="profiles"&&(<>
+            <div style={{display:"flex",gap:4,marginBottom:4}}>
+              {SCEN.map(s=>(<button key={s.id} style={{...TS(profCfg===s.id),borderColor:profCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setProfCfg(s.id)}>{s.short}</button>))}
+            </div>
+            <div style={PS}>
+              <div style={SL}>72-HR DISPATCH {"\u2014"} {SCEN.find(s=>s.id===profCfg)?.short}</div>
+              <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:6}}>Stacked gen vs flat load. Yellow bars = unmet load. Red = curtailment. Day 2 has a wind lull stress event.</div>
+              <PChart profile={computed[profCfg].disp} p={p}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+              {[
+                {l:"RELIABILITY",v:`${computed[profCfg].disp.stats.reliability.toFixed(2)}%`,c:computed[profCfg].disp.stats.reliability>=99.9?"#2D8C6F":"#E8A838"},
+                {l:"CURTAILMENT",v:`${computed[profCfg].disp.stats.curtailPct.toFixed(1)}%`,c:computed[profCfg].disp.stats.curtailPct>10?"#C24B4B":"#6B7280"},
+                {l:"UNMET LOAD",v:`${computed[profCfg].disp.stats.totUnmet.toFixed(0)} MWh`,c:computed[profCfg].disp.stats.totUnmet>0?"#FFD700":"#2D8C6F"},
+                {l:"AVG GAS",v:`${computed[profCfg].disp.stats.avgGas.toFixed(0)} MW`,c:"#C24B4B"},
+              ].map(m=>(<div key={m.l} style={{...PS,padding:10}}><div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,textTransform:"uppercase",letterSpacing:"0.05em"}}>{m.l}</div><div style={{fontSize:16,fontWeight:700,fontFamily:F.m,color:m.c,lineHeight:1.2}}>{m.v}</div></div>))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {SCEN.filter(s=>s.id!==profCfg).map(s=>(<div key={s.id} style={{background:"#0C0F14",borderRadius:4,padding:8}}>
+                <div style={{fontSize:9,fontFamily:F.m,color:s.color,fontWeight:600,marginBottom:2}}>{s.short} <span style={{color:computed[s.id].disp.stats.reliability>=99.9?"#2D8C6F":"#E8A838",fontWeight:400}}>{computed[s.id].disp.stats.reliability.toFixed(1)}%</span></div>
+                <PChart profile={computed[s.id].disp} p={p} height={140}/>
+              </div>))}
+            </div>
+          </>)}
+
+          {/* ===== SLD ===== */}
+          {tab==="sld"&&(<>
+            <div style={{display:"flex",gap:4,marginBottom:4}}>
+              {SCEN.map(s=>(<button key={s.id} style={{...TS(sldCfg===s.id),borderColor:sldCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setSldCfg(s.id)}>{s.short}</button>))}
+            </div>
+            <div style={PS}>
+              <div style={SL}>SINGLE LINE DIAGRAM {"\u2014"} {SCEN.find(s=>s.id===sldCfg)?.short}</div>
+              <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:6}}>Generator {"\u2192"} MV collection {"\u2192"} step-up xfmr {"\u2192"} HV bus {"\u2192"} step-down {"\u2192"} DC switchgear. CB = circuit breaker, GSU/SSU = gen/station step-up, PCS = power conversion system, INV = inverter.</div>
+              <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {SCEN.filter(s=>s.id!==sldCfg).map(s=>(
+                <div key={s.id} style={{background:"#0C0F14",borderRadius:4,padding:8}}>
+                  <div style={{fontSize:9,fontFamily:F.m,color:s.color,fontWeight:600,marginBottom:2}}>{s.short}</div>
+                  <SLD configId={s.id} sz={computed[s.id].sz} p={p}/>
+                </div>
+              ))}
+            </div>
+          </>)}
+
+          {/* ===== TORNADO ===== */}
+          {tab==="tornado"&&(<>
+            <div style={{display:"flex",gap:4,marginBottom:4}}>
+              {SCEN.map(s=>(<button key={s.id} style={{...TS(torCfg===s.id),borderColor:torCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setTorCfg(s.id)}>{s.short}</button>))}
+            </div>
+            <div style={PS}>
+              <div style={SL}>TORNADO SENSITIVITY {"\u2014"} {SCEN.find(s=>s.id===torCfg)?.short}</div>
+              {(()=>{const bL=results[torCfg].lcoe;const sc=SCEN.find(s=>s.id===torCfg);
+                const sorted=tornado.map(v=>{const lo=v.loR[torCfg].lcoe,hi=v.hiR[torCfg].lcoe;return{...v,lo,hi,imp:Math.abs(hi-lo)};}).sort((a,b)=>b.imp-a.imp);
+                const mI=Math.max(...sorted.map(s=>s.imp));
+                return sorted.map(v=>{if(v.imp<0.1)return null;const lD=v.lo-bL,hD=v.hi-bL,mn=Math.min(lD,hD),mx=Math.max(lD,hD),sc2=200/(mI||1);
+                  const fV=(val,u)=>u==="%"?`${(val*100).toFixed(1)}%`:`$${val.toFixed(val<10?2:0)}`;
+                  return(<div key={v.key} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <div style={{width:100,fontSize:9,fontFamily:F.m,color:"#9CA3AF",textAlign:"right",flexShrink:0}}>{v.label}</div>
+                    <div style={{width:45,fontSize:8,fontFamily:F.m,color:"#6B7280",textAlign:"right",flexShrink:0}}>{fV(v.loVal,v.u)}</div>
+                    <div style={{flex:1,position:"relative",height:18}}>
+                      <div style={{position:"absolute",left:"50%",top:0,width:1,height:18,background:"#2A3040"}}/>
+                      <div style={{position:"absolute",left:mn<0?`${50+mn*sc2/2}%`:"50%",width:`${Math.abs(mn)*sc2/2}%`,height:18,background:mn<0?"#2D8C6F80":"#C24B4B80",borderRadius:2,top:0}}/>
+                      <div style={{position:"absolute",left:mx<0?`${50+mx*sc2/2}%`:"50%",width:`${Math.abs(mx)*sc2/2}%`,height:18,background:mx>0?"#C24B4B80":"#2D8C6F80",borderRadius:2,top:0}}/>
+                    </div>
+                    <div style={{width:45,fontSize:8,fontFamily:F.m,color:"#6B7280",flexShrink:0}}>{fV(v.hiVal,v.u)}</div>
+                    <div style={{width:55,fontSize:9,fontFamily:F.m,color:sc.color,textAlign:"right",flexShrink:0,fontWeight:600}}>{"\u00B1"}${(v.imp/2).toFixed(1)}</div>
+                  </div>);});})()}
+            </div>
+          </>)}
+
+          {/* ===== SCENARIOS ===== */}
+          {tab==="scenarios"&&(<>
+            {/* Cross-config live comparison - always visible at top */}
+            <div style={PS}>
+              <div style={SL}>ALL CONFIGS {"\u2014"} BULL vs BASE vs BEAR (per-config stress)</div>
+              <div style={{ fontSize: 8, color: "#4B5563", fontFamily: F.m, marginBottom: 8 }}>
+                Each config stressed with its own best/worst inputs. Click a row to drill in below.
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: F.m }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #2A3040" }}>
+                    <th style={{ padding: "6px 4px", textAlign: "left", color: "#6B7280", fontSize: 8 }}>CONFIG</th>
+                    <th style={{ padding: "6px 4px", textAlign: "right", color: "#2D8C6F", fontSize: 8 }}>BULL</th>
+                    <th style={{ padding: "6px 4px", textAlign: "right", color: "#E8E6E1", fontSize: 8 }}>BASE</th>
+                    <th style={{ padding: "6px 4px", textAlign: "right", color: "#C24B4B", fontSize: 8 }}>BEAR</th>
+                    <th style={{ padding: "6px 4px", textAlign: "right", color: "#E8A838", fontSize: 8 }}>RANGE</th>
+                    <th style={{ padding: "6px 4px", textAlign: "right", color: "#6B7280", fontSize: 8 }}>EXPOSURE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const rows = SCEN.map(s2 => {
+                      const sr2 = scenarioResults[s2.id];
+                      if (!sr2) return null;
+                      const bu = sr2.bull?.lcoe || 0;
+                      const ba = sr2.base?.lcoe || 0;
+                      const be = sr2.bear?.lcoe || 0;
+                      const rng = be - bu;
+                      return { s: s2, bu, ba, be, rng };
+                    }).filter(Boolean);
+                    const minRng = Math.min(...rows.map(r => r.rng));
+                    return rows.map(r => (
+                      <tr key={r.s.id}
+                        onClick={() => setScenCfg(r.s.id)}
+                        style={{ borderBottom: "1px solid #1E2330", background: r.s.id === scenCfg ? "#1A1D25" : "transparent", cursor: "pointer" }}>
+                        <td style={{ padding: "6px 4px", color: r.s.color, fontWeight: 600 }}>
+                          {r.s.id === scenCfg ? "\u25B6 " : ""}{r.s.short}
+                        </td>
+                        <td style={{ padding: "6px 4px", textAlign: "right", color: "#2D8C6F" }}>${r.bu.toFixed(1)}</td>
+                        <td style={{ padding: "6px 4px", textAlign: "right", color: "#E8E6E1" }}>${r.ba.toFixed(1)}</td>
+                        <td style={{ padding: "6px 4px", textAlign: "right", color: "#C24B4B" }}>${r.be.toFixed(1)}</td>
+                        <td style={{ padding: "6px 4px", textAlign: "right", color: "#E8E6E1", fontWeight: 600 }}>
+                          ${r.rng.toFixed(1)} {Math.abs(r.rng - minRng) < 0.5 && <span style={{ color: "#E8A838" }}>{"\u2605"}</span>}
+                        </td>
+                        <td style={{ padding: "4px 8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", height: 14 }}>
+                            <div style={{ flex: 1, height: 6, background: "#1E2330", borderRadius: 3, position: "relative" }}>
+                              <div style={{
+                                position: "absolute",
+                                left: `${Math.max(0, (r.bu / (r.be * 1.1)) * 100)}%`,
+                                width: `${Math.max(2, ((r.be - r.bu) / (r.be * 1.1)) * 100)}%`,
+                                height: 6,
+                                background: `linear-gradient(90deg, #2D8C6F, ${r.s.color}, #C24B4B)`,
+                                borderRadius: 3,
+                              }} />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Config selector */}
+            <div style={{display:"flex",gap:4,marginBottom:4}}>
+              {SCEN.map(s=>(<button key={s.id} style={{...TS(scenCfg===s.id),borderColor:scenCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setScenCfg(s.id)}>{s.short}</button>))}
+            </div>
+
+            {(() => {
+              const si = SCENARIO_INPUTS[scenCfg];
+              const sc = SCEN.find(s => s.id === scenCfg);
+              const sr = scenarioResults[scenCfg];
+              if (!si || !sr) return null;
+              const bullLcoe = sr.bull?.lcoe || 0;
+              const baseLcoe = sr.base?.lcoe || 0;
+              const bearLcoe = sr.bear?.lcoe || 0;
+              const customLcoe = sr.custom?.lcoe || 0;
+              const bl = blendSlider[scenCfg];
+
+              // Get current custom values for display
+              const customParams = sr.customParams || p;
+
+              return (
+                <>
+                  {/* LCOE summary: BULL | BASE | BEAR + custom */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+                    {[
+                      { label: "BULL", sub: si.bullLabel, lcoe: bullLcoe, color: "#2D8C6F", bg: "#0D2818" },
+                      { label: "BASE", sub: "Current assumptions", lcoe: baseLcoe, color: "#E8E6E1", bg: "#1A1A1A" },
+                      { label: "BEAR", sub: si.bearLabel, lcoe: bearLcoe, color: "#C24B4B", bg: "#2A1515" },
+                      { label: "CUSTOM", sub: `Blend: ${bl < 0.5 ? "bear" : bl > 0.5 ? "bull" : "base"}-leaning`, lcoe: customLcoe, color: sc.color, bg: "#12151C" },
+                    ].map(c => (
+                      <div key={c.label} style={{ ...PS, background: c.bg, borderColor: c.color + "30", padding: 12 }}>
+                        <div style={{ fontSize: 9, fontFamily: F.m, color: c.color, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 2 }}>{c.label}</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, fontFamily: F.m, color: c.color, lineHeight: 1 }}>${c.lcoe.toFixed(1)}</div>
+                        <div style={{ fontSize: 8, color: "#6B7280", fontFamily: F.m }}>/MWh</div>
+                        <div style={{ fontSize: 8, color: "#4B5563", fontFamily: F.m, marginTop: 6, lineHeight: 1.4 }}>{c.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Master blend slider */}
+                  <div style={PS}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <div style={SL}>SCENARIO BLEND</div>
+                      <div style={{ fontSize: 9, fontFamily: F.m, color: "#9CA3AF" }}>
+                        Drag to interpolate all assumptions between bear and bull
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 9, fontFamily: F.m, color: "#C24B4B", flexShrink: 0 }}>BEAR</span>
+                      <input type="range" min={0} max={1} step={0.02} value={bl}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value);
+                          setBlendSlider(prev => ({ ...prev, [scenCfg]: v }));
+                          setScenBlends(prev => ({ ...prev, [scenCfg]: {} })); // clear overrides
+                        }}
+                        style={{ flex: 1, height: 3, accentColor: sc.color }} />
+                      <span style={{ fontSize: 9, fontFamily: F.m, color: "#2D8C6F", flexShrink: 0 }}>BULL</span>
+                    </div>
+                    <div style={{ textAlign: "center", fontSize: 10, fontFamily: F.m, color: sc.color, fontWeight: 600, marginTop: 4 }}>
+                      Custom LCOE: ${customLcoe.toFixed(1)}/MWh
+                    </div>
+                  </div>
+
+                  {/* Assumption table with per-input sliders */}
+                  <div style={PS}>
+                    <div style={SL}>ASSUMPTIONS {"\u2014"} {sc.short}</div>
+                    <div style={{ fontSize: 8, color: "#4B5563", fontFamily: F.m, marginBottom: 10 }}>
+                      Each row shows bull/base/bear values. Adjust individual inputs to override the blend.
+                    </div>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: F.m }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #2A3040" }}>
+                          <th style={{ padding: "6px 4px", textAlign: "left", color: "#6B7280", fontSize: 8, width: 110 }}>INPUT</th>
+                          <th style={{ padding: "6px 4px", textAlign: "right", color: "#2D8C6F", fontSize: 8, width: 60 }}>BULL</th>
+                          <th style={{ padding: "6px 4px", textAlign: "right", color: "#E8E6E1", fontSize: 8, width: 60 }}>BASE</th>
+                          <th style={{ padding: "6px 4px", textAlign: "right", color: "#C24B4B", fontSize: 8, width: 60 }}>BEAR</th>
+                          <th style={{ padding: "6px 4px", textAlign: "center", color: sc.color, fontSize: 8 }}>CUSTOM</th>
+                          <th style={{ padding: "6px 4px", textAlign: "right", color: sc.color, fontSize: 8, width: 65 }}>VALUE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {si.inputs.map(inp => {
+                          const curVal = customParams[inp.key] !== undefined ? customParams[inp.key] : inp.base;
+                          const fmtV = (v) => inp.unit === "%" ? `${(v * 100).toFixed(1)}%` : inp.unit === "$/MMBtu" ? `$${v.toFixed(2)}` : inp.unit === "MMBtu/MWh" ? v.toFixed(1) : `$${v.toFixed(0)}`;
+                          const sliderMin = Math.min(inp.bull, inp.bear);
+                          const sliderMax = Math.max(inp.bull, inp.bear);
+                          const step = inp.unit === "%" ? 0.01 : inp.unit === "$/MMBtu" ? 0.25 : inp.unit === "MMBtu/MWh" ? 0.1 : 10;
+
+                          return (
+                            <tr key={inp.key} style={{ borderBottom: "1px solid #1E2330" }}>
+                              <td style={{ padding: "6px 4px", color: "#9CA3AF", fontSize: 9 }}>{inp.label}</td>
+                              <td style={{ padding: "6px 4px", textAlign: "right", color: "#2D8C6F", fontSize: 9 }}>{fmtV(inp.bull)}</td>
+                              <td style={{ padding: "6px 4px", textAlign: "right", color: "#E8E6E1", fontSize: 9 }}>{fmtV(inp.base)}</td>
+                              <td style={{ padding: "6px 4px", textAlign: "right", color: "#C24B4B", fontSize: 9 }}>{fmtV(inp.bear)}</td>
+                              <td style={{ padding: "4px 8px" }}>
+                                <input type="range"
+                                  min={sliderMin} max={sliderMax} step={step}
+                                  value={curVal}
+                                  onChange={e => {
+                                    const v = parseFloat(e.target.value);
+                                    setScenBlends(prev => ({
+                                      ...prev,
+                                      [scenCfg]: { ...prev[scenCfg], [inp.key]: v },
+                                    }));
+                                  }}
+                                  style={{ width: "100%", height: 2, accentColor: sc.color }}
+                                />
+                              </td>
+                              <td style={{ padding: "6px 4px", textAlign: "right", color: sc.color, fontSize: 10, fontWeight: 600 }}>
+                                {fmtV(curVal)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+          </>)}
+
+          {/* ===== SIZING ===== */}
+          {tab==="sizing"&&(
+            <div style={PS}>
+              <div style={SL}>INFRASTRUCTURE SIZING {"\u2014"} 100% RELIABLE</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:F.m}}>
+                <thead><tr style={{borderBottom:"1px solid #2A3040"}}>
+                  {["Config","Solar MW","Wind MW","Gas MW","Batt MW","Batt GWh","Overbuild","Capex","Reliability"].map(h=>
+                    <th key={h} style={{padding:"6px 4px",textAlign:"right",color:"#6B7280",fontWeight:500,fontSize:8}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{SCEN.map(s=>{const r=results[s.id],sz=computed[s.id].sz,d=computed[s.id].disp.stats;return(
+                  <tr key={s.id} style={{borderBottom:"1px solid #1E2330"}}>
+                    <td style={{padding:"6px 4px",color:s.color,fontWeight:600}}>{s.short}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.solarMW?"#E8E6E1":"#2A3040"}}>{sz.solarMW?sz.solarMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.windMW?"#E8E6E1":"#2A3040"}}>{sz.windMW?sz.windMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.gasMW?"#E8E6E1":"#2A3040"}}>{sz.gasMW?sz.gasMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMW?"#E8E6E1":"#2A3040"}}>{sz.battMW?sz.battMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMWh?"#E8E6E1":"#2A3040"}}>{sz.battMWh?(sz.battMWh/1000).toFixed(1):"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}>{r.overbuild.toFixed(1)}x</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",fontWeight:600}}>{fmt$(r.netCapex)}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</td>
+                  </tr>);})}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
