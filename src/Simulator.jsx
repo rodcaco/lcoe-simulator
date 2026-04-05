@@ -1179,20 +1179,9 @@ export default function App() {
             <div style={{display:"flex",gap:4,marginBottom:4}}>
               {SCEN.map(s=>(<button key={s.id} style={{...TS(sldCfg===s.id),borderColor:sldCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setSldCfg(s.id)}>{s.short}</button>))}
             </div>
-            <div style={PS}>
-              <div style={SL}>SINGLE LINE DIAGRAM {"\u2014"} {SCEN.find(s=>s.id===sldCfg)?.short}</div>
-              <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:6}}>Generator {"\u2192"} MV collection {"\u2192"} step-up xfmr {"\u2192"} HV bus {"\u2192"} step-down {"\u2192"} DC switchgear. CB = circuit breaker, GSU/SSU = gen/station step-up, PCS = power conversion system, INV = inverter.</div>
-              <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p}/>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {SCEN.filter(s=>s.id!==sldCfg).map(s=>(
-                <div key={s.id} style={{background:"#0C0F14",borderRadius:4,padding:8}}>
-                  <div style={{fontSize:9,fontFamily:F.m,color:s.color,fontWeight:600,marginBottom:2}}>{s.short}</div>
-                  <SLD configId={s.id} sz={computed[s.id].sz} p={p}/>
-                </div>
-              ))}
-            </div>
+            <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p}/>
           </>)}
+
 
           {/* ===== TORNADO ===== */}
           {tab==="tornado"&&(<>
