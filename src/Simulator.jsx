@@ -96,7 +96,7 @@ const SCENARIO_INPUTS = {
     inputs: [
       { key:"gasPrice",   label:"Gas Price",    unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
       { key:"heatRate",   label:"Heat Rate",    unit:"MMBtu/MWh",base:6.6,bull:6.0,bear:8.5 },
-      { key:"gasTurbine", label:"GT+HRSG+ST",   unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"gasTurbine", label:"Gas Plant",   unit:"$/kW",  base:550, bull:450, bear:1200 },
       { key:"gasBOP",     label:"Gas BOP",      unit:"$/kW",  base:120, bull:80,  bear:400 },
       { key:"gasPipeline",label:"Gas Lateral",   unit:"$/kW",  base:40,  bull:15,  bear:200 },
       { key:"wacc",       label:"WACC",          unit:"%",     base:0.08,bull:0.06,bear:0.13 },
@@ -125,7 +125,7 @@ const SCENARIO_INPUTS = {
       { key:"solarModule",label:"Solar Module",  unit:"$/kW",  base:450, bull:280, bear:700 },
       { key:"windTSA",    label:"Wind TSA",      unit:"$/kW",  base:750, bull:550, bear:1050 },
       { key:"gasPrice",   label:"Gas Price",     unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
-      { key:"gasTurbine", label:"GT+HRSG+ST",    unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"gasTurbine", label:"Gas Plant",    unit:"$/kW",  base:550, bull:450, bear:1200 },
       { key:"battCells",  label:"Batt Cells",    unit:"$/kWh", base:150, bull:80,  bear:350 },
       { key:"solarITC",   label:"Solar ITC",      unit:"%",     base:0.30,bull:0.50,bear:0.00 },
       { key:"windPTC",    label:"Wind PTC",       unit:"$/MWh", base:26,  bull:35,  bear:0 },
@@ -256,7 +256,7 @@ function dispatch(p, sz, hours=72) {
 
 function tornadoData(p, gasConfig){
   // Use gasConfig values for heat rate and gas capex
-  const pWithGas = {...p, heatRate: gasConfig.weightedHR, gasTurbine: gasConfig.weightedCapex};
+  const pWithGas = {...p, heatRate: gasConfig.weightedHR};
   const vars=[
     {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas CapEx",u:"$/kW",r:0.3},
     {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.25},{key:"wacc",label:"WACC",u:"%",r:0.5},
@@ -363,7 +363,7 @@ function GasPresetPanel({gasPreset, setGasPreset, gasConfig, gasMetrics}) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:9,fontFamily:F.m}}>
           <div><span style={{color:"#6B7280"}}>Heat Rate:</span> <span style={{color:"#E8A838"}}>{gasConfig.weightedHR} MMBtu/MWh</span></div>
           <div><span style={{color:"#6B7280"}}>Startup:</span> <span style={{color:"#2D8C6F"}}>{gasConfig.avgStartup} min</span></div>
-          <div><span style={{color:"#6B7280"}}>CapEx:</span> <span style={{color:"#E8E6E1"}}>${gasConfig.weightedCapex}/kW</span></div>
+          <div><span style={{color:"#6B7280"}}>CapEx:</span> <span style={{color:"#9CA3AF"}}>from slider</span></div>
           <div><span style={{color:"#6B7280"}}>Capacity:</span> <span style={{color:"#E8E6E1"}}>{gasConfig.totalMW} MW</span></div>
         </div>
         <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -920,7 +920,7 @@ export default function App() {
         upsMWh: bs.upsMWh || 0,
       };
       // Override heat rate and gas capex with preset values for gas scenarios
-      const pEff = hasGas ? {...p, heatRate: gasConfig.weightedHR, gasTurbine: gasConfig.weightedCapex} : p;
+      const pEff = hasGas ? {...p, heatRate: gasConfig.weightedHR} : p;
       const lcoe = computeLCOE(pEff, sz, s.id);
       const disp = dispatch(p, sz);
       out[s.id] = { base: bs, sz, lcoe, disp };
@@ -1019,7 +1019,7 @@ export default function App() {
             {key:"windEPC",label:"EPC+Soft",min:50,max:350,step:10,unit:"$/kW"},
           ]}/>
           <CxP title="GAS CC" color="#C24B4B" p={p} update={update} items={[
-            {key:"gasTurbine",label:"GT+HRSG+ST",min:300,max:2000,step:25,unit:"$/kW"},
+            {key:"gasTurbine",label:"Gas Plant",min:300,max:2000,step:25,unit:"$/kW"},
             {key:"gasBOP",label:"BOP (all)",min:50,max:800,step:10,unit:"$/kW"},
             {key:"gasPipeline",label:"Gas Lateral",min:10,max:400,step:10,unit:"$/kW"},
             {key:"gasEPC",label:"EPC+Permit",min:30,max:500,step:10,unit:"$/kW"},
