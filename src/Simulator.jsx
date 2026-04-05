@@ -17,6 +17,45 @@ const GAS_EQUIP = {
   aero:   { name:"Aeroderivative Simple Cycle", short:"Aero", unitMW:50, heatRate:8.8, capex:1100, startMin:10, voltage:"34.5kV", color:"#06b6d4" },
   recip:  { name:"Reciprocating Engine", short:"Recip", unitMW:20, heatRate:7.8, capex:950, startMin:5, voltage:"13.8kV", color:"#22c55e" },
 };
+const GAS_PRESETS = {
+  baseload: {
+    name: "Baseload Combined Cycle",
+    desc: "3× H-Frame (1,200 MW) — Lowest fuel cost, slow start",
+    equipment: { hframe: 3, fframe: 0, aero: 0, recip: 0 },
+    totalMW: 1200, weightedHR: 5.8, weightedCapex: 850, avgStartup: 180,
+  },
+  flexible: {
+    name: "Flexible Combined Cycle",
+    desc: "6× F-Frame (1,200 MW) — Balanced efficiency & flexibility",
+    equipment: { hframe: 0, fframe: 6, aero: 0, recip: 0 },
+    totalMW: 1200, weightedHR: 6.2, weightedCapex: 900, avgStartup: 120,
+  },
+  peaker: {
+    name: "Fast Peaker Fleet",
+    desc: "24× Aeroderivative (1,200 MW) — 10-min start, higher fuel",
+    equipment: { hframe: 0, fframe: 0, aero: 24, recip: 0 },
+    totalMW: 1200, weightedHR: 8.8, weightedCapex: 1100, avgStartup: 10,
+  },
+  ultraflex: {
+    name: "Ultra-Flexible Recips",
+    desc: "60× Reciprocating (1,200 MW) — 5-min start, most modular",
+    equipment: { hframe: 0, fframe: 0, aero: 0, recip: 60 },
+    totalMW: 1200, weightedHR: 7.8, weightedCapex: 950, avgStartup: 5,
+  },
+  hybrid_ha: {
+    name: "Hybrid: H-Frame + Aero",
+    desc: "2× H-Frame + 8× Aero (1,200 MW) — Efficiency + fast backup",
+    equipment: { hframe: 2, fframe: 0, aero: 8, recip: 0 },
+    totalMW: 1200, weightedHR: 6.5, weightedCapex: 900, avgStartup: 65,
+  },
+  hybrid_fr: {
+    name: "Hybrid: F-Frame + Recip",
+    desc: "4× F-Frame + 20× Recip (1,200 MW) — Flexible + backup-ready",
+    equipment: { hframe: 0, fframe: 4, aero: 0, recip: 20 },
+    totalMW: 1200, weightedHR: 6.7, weightedCapex: 915, avgStartup: 45,
+  },
+};
+
 const SCEN = [
   {id:"sb",label:"Solar + Battery",short:"S+B",color:"#D4A026",sources:["solar","battery"]},
   {id:"wb",label:"Wind + Battery",short:"W+B",color:"#3D7EC7",sources:["wind","battery"]},
@@ -288,43 +327,41 @@ function PChart({profile,p,height=220}){
 }
 
 
-// ============ GAS EQUIPMENT PANEL ============
-function GasEquipPanel({gasEquip, updateGasEquip, gasMetrics}) {
+// ============ GAS CONFIG PRESET SELECTOR ============
+function GasPresetPanel({gasPreset, setGasPreset, gasConfig, gasMetrics}) {
+  const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
   return (
     <div style={{background:"#12151C",border:"1px solid #1E2330",borderRadius:5,padding:12,marginBottom:8}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#C24B4B",fontFamily:F.m}}>GAS EQUIPMENT MIX</span>
-        <span style={{fontSize:10,color:"#E8E6E1",fontFamily:F.m}}>{gasMetrics.actualMW||0} MW total</span>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#C24B4B",fontFamily:F.m}}>GAS PLANT CONFIG</span>
+        <span style={{fontSize:10,color:"#E8E6E1",fontFamily:F.m}}>{gasMetrics.actualMW} MW</span>
       </div>
-      <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginBottom:8}}>
-        Weighted HR: {gasMetrics.weightedHeatRate.toFixed(1)} MMBtu/MWh | Avg Start: {gasMetrics.avgStartup.toFixed(0)} min
-      </div>
-      {Object.entries(GAS_EQUIP).map(([type, eq]) => {
-        const count = gasEquip[type] || 0;
-        const mw = count * eq.unitMW;
-        return (
-          <div key={type} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:6,background:count>0?"rgba(255,255,255,0.02)":"transparent",borderRadius:4,border:count>0?`1px solid ${eq.color}33`:"1px solid transparent"}}>
-            <div style={{width:70}}>
-              <div style={{fontSize:9,color:eq.color,fontWeight:600,fontFamily:F.m}}>{eq.short}</div>
-              <div style={{fontSize:7,color:"#6B7280",fontFamily:F.m}}>{eq.unitMW}MW | {eq.heatRate} HR</div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:4,flex:1}}>
-              <button onClick={()=>updateGasEquip(type,count-1)} style={{width:20,height:20,borderRadius:4,border:"1px solid #2A3040",background:"#1E2330",color:"#9CA3AF",cursor:"pointer",fontSize:12}}>−</button>
-              <input type="range" min={0} max={type==="hframe"?3:type==="fframe"?6:type==="aero"?20:50} value={count} onChange={e=>updateGasEquip(type,parseInt(e.target.value))} style={{flex:1,height:3,accentColor:eq.color}}/>
-              <button onClick={()=>updateGasEquip(type,count+1)} style={{width:20,height:20,borderRadius:4,border:"1px solid #2A3040",background:"#1E2330",color:"#9CA3AF",cursor:"pointer",fontSize:12}}>+</button>
-              <span style={{width:45,fontSize:10,fontFamily:F.m,color:count>0?eq.color:"#4B5563",textAlign:"right"}}>{count} ({mw}MW)</span>
-            </div>
+      <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
+        {Object.entries(GAS_PRESETS).map(([key, preset]) => (
+          <div key={key} onClick={()=>setGasPreset(key)} style={{
+            padding:"8px 10px", borderRadius:4, cursor:"pointer",
+            background: gasPreset===key ? "rgba(194,75,75,0.15)" : "rgba(255,255,255,0.02)",
+            border: gasPreset===key ? "1px solid #C24B4B" : "1px solid #1E2330",
+          }}>
+            <div style={{fontSize:10,color:gasPreset===key?"#E8E6E1":"#9CA3AF",fontWeight:600,fontFamily:F.m}}>{preset.name}</div>
+            <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginTop:2}}>{preset.desc}</div>
           </div>
-        );
-      })}
-      <div style={{marginTop:8,fontSize:8,color:"#4B5563",fontFamily:F.m}}>
-        <div style={{display:"flex",gap:12}}>
-          <span><span style={{color:"#6366f1"}}>■</span> H: 345kV, slow start, best HR</span>
-          <span><span style={{color:"#f97316"}}>■</span> F: 138kV, moderate</span>
+        ))}
+      </div>
+      <div style={{background:"rgba(0,0,0,0.2)",borderRadius:4,padding:8}}>
+        <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Selected Config Details</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:9,fontFamily:F.m}}>
+          <div><span style={{color:"#6B7280"}}>Heat Rate:</span> <span style={{color:"#E8A838"}}>{gasConfig.weightedHR} MMBtu/MWh</span></div>
+          <div><span style={{color:"#6B7280"}}>Startup:</span> <span style={{color:"#2D8C6F"}}>{gasConfig.avgStartup} min</span></div>
+          <div><span style={{color:"#6B7280"}}>CapEx:</span> <span style={{color:"#E8E6E1"}}>${gasConfig.weightedCapex}/kW</span></div>
+          <div><span style={{color:"#6B7280"}}>Capacity:</span> <span style={{color:"#E8E6E1"}}>{gasConfig.totalMW} MW</span></div>
         </div>
-        <div style={{display:"flex",gap:12}}>
-          <span><span style={{color:"#06b6d4"}}>■</span> Aero: 34.5kV, fast start</span>
-          <span><span style={{color:"#22c55e"}}>■</span> Recip: 13.8kV, fastest</span>
+        <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
+          {Object.entries(gasConfig.equipment).filter(([,c])=>c>0).map(([type,count])=>(
+            <span key={type} style={{fontSize:8,padding:"2px 6px",borderRadius:3,background:equipColors[type]+"22",color:equipColors[type],border:`1px solid ${equipColors[type]}44`}}>
+              {count}× {GAS_EQUIP[type].short}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -776,12 +813,10 @@ export default function App() {
     SCEN.forEach(s => { o[s.id] = { dSolar: 0, dWind: 0, dGas: 0, dBattMW: 0, dBattMWh: 0 }; });
     return o;
   });
-  const [gasEquip, setGasEquip] = useState({ hframe: 0, fframe: 0, aero: 0, recip: 2 });
-  const updateGasEquip = useCallback((type, count) => setGasEquip(prev => ({...prev, [type]: Math.max(0, count)})), []);
-  const gasMetrics = useMemo(() => {
-    const totalMW = Object.entries(gasEquip).reduce((s,[t,c]) => s + c * (GAS_EQUIP[t]?.unitMW||0), 0);
-    return computeGasMetrics(gasEquip, totalMW);
-  }, [gasEquip]);
+  const [gasPreset, setGasPreset] = useState("hybrid_ha");
+  const gasConfig = GAS_PRESETS[gasPreset] || GAS_PRESETS.hybrid_ha;
+  const gasEquip = gasConfig.equipment;
+  const gasMetrics = { weightedHeatRate: gasConfig.weightedHR, weightedCapex: gasConfig.weightedCapex, avgStartup: gasConfig.avgStartup, actualMW: gasConfig.totalMW };
   const update = useCallback((k,v) => setP(prev=>({...prev,[k]:v})), []);
   const updateRel = useCallback((cfgId, key, val) => {
     setRelAdj(prev => ({ ...prev, [cfgId]: { ...prev[cfgId], [key]: val } }));
@@ -859,11 +894,13 @@ export default function App() {
   }, [p, phases]);
 
   // Compute base sizes + adjusted sizes + LCOE + dispatch
+  // Use gasConfig values for gas-related scenarios
   const computed = useMemo(() => {
     const out = {};
     SCEN.forEach(s => {
       const bs = baseSize(p, s.id);
       const adj = relAdj[s.id];
+      const hasGas = s.sources.includes("gas");
       const sz = {
         solarMW: Math.max(0, bs.solarMW + adj.dSolar),
         windMW: Math.max(0, bs.windMW + adj.dWind),
@@ -872,12 +909,14 @@ export default function App() {
         battMWh: Math.max(0, (bs.battMWh||0) + adj.dBattMWh),
         upsMWh: bs.upsMWh || 0,
       };
-      const lcoe = computeLCOE(p, sz, s.id);
+      // Override heat rate and gas capex with preset values for gas scenarios
+      const pEff = hasGas ? {...p, heatRate: gasConfig.weightedHR, gasTurbine: gasConfig.weightedCapex} : p;
+      const lcoe = computeLCOE(pEff, sz, s.id);
       const disp = dispatch(p, sz);
       out[s.id] = { base: bs, sz, lcoe, disp };
     });
     return out;
-  }, [p, relAdj]);
+  }, [p, relAdj, gasConfig]);
 
   const tornado = useMemo(() => tornadoData(p), [p]);
   // Per-config scenario blend: 0 = bear, 0.5 = base, 1.0 = bull
@@ -975,7 +1014,7 @@ export default function App() {
             {key:"gasPipeline",label:"Gas Lateral",min:10,max:400,step:10,unit:"$/kW"},
             {key:"gasEPC",label:"EPC+Permit",min:30,max:500,step:10,unit:"$/kW"},
           ]}/>
-          <GasEquipPanel gasEquip={gasEquip} updateGasEquip={updateGasEquip} gasMetrics={gasMetrics}/>
+          <GasPresetPanel gasPreset={gasPreset} setGasPreset={setGasPreset} gasConfig={gasConfig} gasMetrics={gasMetrics}/>
           <CxP title="BATTERY" color="#2D8C6F" p={p} update={update} items={[
             {key:"battCells",label:"LFP Cells",min:50,max:400,step:10,unit:"$/kWh"},
             {key:"battBOP",label:"PCS/BOP",min:30,max:200,step:5,unit:"$/kWh"},
