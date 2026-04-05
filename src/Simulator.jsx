@@ -254,18 +254,28 @@ function dispatch(p, sz, hours=72) {
   }};
 }
 
-function tornadoData(p){
+function tornadoData(p, gasConfig){
+  // Use gasConfig values for heat rate and gas capex
+  const pWithGas = {...p, heatRate: gasConfig.weightedHR, gasTurbine: gasConfig.weightedCapex};
   const vars=[
-    {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas Turbine",u:"$/kW",r:0.5},
-    {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.3},{key:"wacc",label:"WACC",u:"%",r:0.5},
+    {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas CapEx",u:"$/kW",r:0.3},
+    {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.25},{key:"wacc",label:"WACC",u:"%",r:0.5},
     {key:"battCells",label:"Batt Cells",u:"$/kWh",r:0.5},{key:"solarModule",label:"Solar Module",u:"$/kW",r:0.4},
     {key:"windTSA",label:"Wind TSA",u:"$/kW",r:0.4},{key:"solarCF",label:"Solar CF",u:"%",r:0.25},
     {key:"windCF",label:"Wind CF",u:"%",r:0.25},{key:"solarITC",label:"Solar ITC",u:"%",r:1.0},
   ];
   return vars.map(v=>{
-    const lo={...p,[v.key]:p[v.key]*(1-v.r)},hi={...p,[v.key]:p[v.key]*(1+v.r)};
+    const base = pWithGas[v.key];
+    const lo={...pWithGas,[v.key]:base*(1-v.r)},hi={...pWithGas,[v.key]:base*(1+v.r)};
     const loR={},hiR={};
-    SCEN.forEach(s=>{loR[s.id]=computeLCOE(lo,baseSize(lo,s.id),s.id);hiR[s.id]=computeLCOE(hi,baseSize(hi,s.id),s.id);});
+    SCEN.forEach(s=>{
+      const hasGas = s.sources.includes("gas");
+      // For gas scenarios, use the modified params; for non-gas, use original p
+      const loEff = hasGas ? lo : {...p,[v.key]:p[v.key]*(1-v.r)};
+      const hiEff = hasGas ? hi : {...p,[v.key]:p[v.key]*(1+v.r)};
+      loR[s.id]=computeLCOE(loEff,baseSize(loEff,s.id),s.id);
+      hiR[s.id]=computeLCOE(hiEff,baseSize(hiEff,s.id),s.id);
+    });
     return{...v,loVal:lo[v.key],hiVal:hi[v.key],loR,hiR};
   });
 }
@@ -918,7 +928,7 @@ export default function App() {
     return out;
   }, [p, relAdj, gasConfig]);
 
-  const tornado = useMemo(() => tornadoData(p), [p]);
+  const tornado = useMemo(() => tornadoData(p, gasConfig), [p, gasConfig]);
   // Per-config scenario blend: 0 = bear, 0.5 = base, 1.0 = bull
   // And per-input overrides
   const [scenCfg, setScenCfg] = useState("gu");
