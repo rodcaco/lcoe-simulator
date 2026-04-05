@@ -337,7 +337,7 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
   const [showVoltages, setShowVoltages] = useState(true);
 
   const L = p.loadMW;
-  const W = 1100, H = 720;
+  const W = 1100, H = 820;
 
   const hasSolar = sz.solarMW > 0, hasWind = sz.windMW > 0, hasGas = sz.gasMW > 0, hasBatt = (sz.battMW||0) > 0;
   const solarMW = sz.solarMW || 0, windMW = sz.windMW || 0, gasMW = sz.gasMW || 0, battMW = sz.battMW || 0, battMWh = sz.battMWh || 0;
@@ -349,7 +349,7 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
     gas: "#C24B4B", battery: "#2D8C6F", wire: "#556677", text: "#8899aa", textBright: "#E8E6E1",
   };
 
-  const BUS_Y = { hv: 80, mv: 220, gen: 400, dc: 560 };
+  const BUS_Y = { hv: 100, mv: 280, gen: 480, dc: 640 };
   const busMargin = 60, busWidth = W - busMargin * 2, busStartX = busMargin;
 
   const Bus = ({x, y, width, color, label, thickness=4}) => (
@@ -579,7 +579,7 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
             const aCount = gasEquip.aero || 0;
             const rCount = gasEquip.recip || 0;
             const hasH = hCount > 0, hasF = fCount > 0, hasA = aCount > 0, hasR = rCount > 0;
-            const BUS_345 = 50, BUS_138 = 140, BUS_GEN = BUS_Y.gen;
+            const BUS_345 = 150, BUS_138 = 230, BUS_GEN = BUS_Y.gen;
             const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
 
             return (
@@ -708,7 +708,7 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
             </g>
           ))}
 
-          <DataCenter x={dcCenterX} y={BUS_Y.dc+90} mw={L} id="dc-load"/>
+          <DataCenter x={dcCenterX} y={BUS_Y.dc+70} mw={L} id="dc-load"/>
 
           {!hasSolar && !hasWind && !hasGas && !hasBatt && (
             <text x={W/2} y={H/2} textAnchor="middle" fill="#445" fontSize={12} fontFamily={F.m}>
