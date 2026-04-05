@@ -10,6 +10,13 @@ const DEF = {
   solarOM:12, windOM:28, gasOMFixed:18, gasOMVar:3.5, battOM:6, omEsc:0.02,
   wacc:0.08, life:25, solarITC:0.30, windPTC:26, battITC:0.30, loadMW:1000,
 };
+
+const GAS_EQUIP = {
+  hframe: { name:"H-Frame Combined Cycle", short:"H-Frame", unitMW:400, heatRate:5.8, capex:850, startMin:180, voltage:"345kV", color:"#6366f1" },
+  fframe: { name:"F-Frame Combined Cycle", short:"F-Frame", unitMW:200, heatRate:6.2, capex:900, startMin:120, voltage:"138kV", color:"#f97316" },
+  aero:   { name:"Aeroderivative Simple Cycle", short:"Aero", unitMW:50, heatRate:8.8, capex:1100, startMin:10, voltage:"34.5kV", color:"#06b6d4" },
+  recip:  { name:"Reciprocating Engine", short:"Recip", unitMW:20, heatRate:7.8, capex:950, startMin:5, voltage:"13.8kV", color:"#22c55e" },
+};
 const SCEN = [
   {id:"sb",label:"Solar + Battery",short:"S+B",color:"#D4A026",sources:["solar","battery"]},
   {id:"wb",label:"Wind + Battery",short:"W+B",color:"#3D7EC7",sources:["wind","battery"]},
@@ -89,6 +96,24 @@ const SCENARIO_INPUTS = {
     bearLabel: "All inputs stressed: expensive capex, high gas, no IRA",
   },
 };
+
+
+function computeGasMetrics(gasEquipCounts, totalGasMW) {
+  if (totalGasMW <= 0) return { weightedHeatRate: 6.6, weightedCapex: 550, avgStartup: 60 };
+  let totHR = 0, totCapex = 0, totStart = 0, totMW = 0;
+  Object.entries(gasEquipCounts).forEach(([type, count]) => {
+    if (count > 0 && GAS_EQUIP[type]) {
+      const eq = GAS_EQUIP[type];
+      const mw = count * eq.unitMW;
+      totHR += mw * eq.heatRate;
+      totCapex += mw * eq.capex;
+      totStart += mw * eq.startMin;
+      totMW += mw;
+    }
+  });
+  if (totMW === 0) return { weightedHeatRate: 6.6, weightedCapex: 550, avgStartup: 60, actualMW: 0 };
+  return { weightedHeatRate: totHR/totMW, weightedCapex: totCapex/totMW, avgStartup: totStart/totMW, actualMW: totMW };
+}
 
 function crf(r,n){return r===0?1/n:(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
 
@@ -262,8 +287,52 @@ function PChart({profile,p,height=220}){
   );
 }
 
+
+// ============ GAS EQUIPMENT PANEL ============
+function GasEquipPanel({gasEquip, updateGasEquip, gasMetrics}) {
+  return (
+    <div style={{background:"#12151C",border:"1px solid #1E2330",borderRadius:5,padding:12,marginBottom:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#C24B4B",fontFamily:F.m}}>GAS EQUIPMENT MIX</span>
+        <span style={{fontSize:10,color:"#E8E6E1",fontFamily:F.m}}>{gasMetrics.actualMW||0} MW total</span>
+      </div>
+      <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginBottom:8}}>
+        Weighted HR: {gasMetrics.weightedHeatRate.toFixed(1)} MMBtu/MWh | Avg Start: {gasMetrics.avgStartup.toFixed(0)} min
+      </div>
+      {Object.entries(GAS_EQUIP).map(([type, eq]) => {
+        const count = gasEquip[type] || 0;
+        const mw = count * eq.unitMW;
+        return (
+          <div key={type} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:6,background:count>0?"rgba(255,255,255,0.02)":"transparent",borderRadius:4,border:count>0?`1px solid ${eq.color}33`:"1px solid transparent"}}>
+            <div style={{width:70}}>
+              <div style={{fontSize:9,color:eq.color,fontWeight:600,fontFamily:F.m}}>{eq.short}</div>
+              <div style={{fontSize:7,color:"#6B7280",fontFamily:F.m}}>{eq.unitMW}MW | {eq.heatRate} HR</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4,flex:1}}>
+              <button onClick={()=>updateGasEquip(type,count-1)} style={{width:20,height:20,borderRadius:4,border:"1px solid #2A3040",background:"#1E2330",color:"#9CA3AF",cursor:"pointer",fontSize:12}}>−</button>
+              <input type="range" min={0} max={type==="hframe"?3:type==="fframe"?6:type==="aero"?20:50} value={count} onChange={e=>updateGasEquip(type,parseInt(e.target.value))} style={{flex:1,height:3,accentColor:eq.color}}/>
+              <button onClick={()=>updateGasEquip(type,count+1)} style={{width:20,height:20,borderRadius:4,border:"1px solid #2A3040",background:"#1E2330",color:"#9CA3AF",cursor:"pointer",fontSize:12}}>+</button>
+              <span style={{width:45,fontSize:10,fontFamily:F.m,color:count>0?eq.color:"#4B5563",textAlign:"right"}}>{count} ({mw}MW)</span>
+            </div>
+          </div>
+        );
+      })}
+      <div style={{marginTop:8,fontSize:8,color:"#4B5563",fontFamily:F.m}}>
+        <div style={{display:"flex",gap:12}}>
+          <span><span style={{color:"#6366f1"}}>■</span> H: 345kV, slow start, best HR</span>
+          <span><span style={{color:"#f97316"}}>■</span> F: 138kV, moderate</span>
+        </div>
+        <div style={{display:"flex",gap:12}}>
+          <span><span style={{color:"#06b6d4"}}>■</span> Aero: 34.5kV, fast start</span>
+          <span><span style={{color:"#22c55e"}}>■</span> Recip: 13.8kV, fastest</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ ENHANCED SLD COMPONENT ============
-function SLD({configId, sz, p}) {
+function SLD({configId, sz, p, gasEquip, gasMetrics}) {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [showVoltages, setShowVoltages] = useState(true);
 
@@ -503,31 +572,124 @@ function SLD({configId, sz, p}) {
             );
           })()}
 
-          {/* 13.8kV GAS GENERATION BUS */}
-          {hasGas && (
-            <g>
-              <Bus x={busStartX+busWidth*0.25} y={BUS_Y.gen} width={busWidth*0.5} color={COLORS.bus13} label="13.8 kV" thickness={3}/>
+          {/* GAS GENERATION - Equipment-specific voltage levels */}
+          {hasGas && gasEquip && (() => {
+            const hCount = gasEquip.hframe || 0;
+            const fCount = gasEquip.fframe || 0;
+            const aCount = gasEquip.aero || 0;
+            const rCount = gasEquip.recip || 0;
+            const hasH = hCount > 0, hasF = fCount > 0, hasA = aCount > 0, hasR = rCount > 0;
+            const BUS_345 = 50, BUS_138 = 140, BUS_GEN = BUS_Y.gen;
+            const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
 
-              <Wire x1={gasX} y1={BUS_Y.mv} x2={gasX} y2={BUS_Y.mv+20} color={COLORS.bus34}/>
-              <Breaker x={gasX} y={BUS_Y.mv+14} id="cb-mv-gen" label="GEN TIE"/>
-              <Transformer x={gasX} y={BUS_Y.mv+48} label="AUX XFMR" voltages="34.5kV-13.8kV" id="xfmr-aux"/>
-              <Wire x1={gasX} y1={BUS_Y.mv+64} x2={gasX} y2={BUS_Y.gen} color={COLORS.bus13}/>
+            return (
+              <g>
+                {/* 345kV Bus for H-Frame */}
+                {hasH && <Bus x={busStartX} y={BUS_345} width={busWidth*0.4} color="#ff6b6b" label="345 kV" thickness={5}/>}
 
-              {[0,1,2].filter(i => gasMW > i*500).map(i => {
-                const gtX = busStartX + busWidth*0.25 + (i+1) * (busWidth*0.5/4);
-                const unitMW = Math.min(500, gasMW - i*500);
-                return (
-                  <g key={`gt-${i}`}>
-                    <Generator x={gtX} y={BUS_Y.gen-70} label={`GT-${i+1}`} mw={unitMW} type="gas" id={`gen-gt${i}`}/>
-                    <Wire x1={gtX} y1={BUS_Y.gen-48} x2={gtX} y2={BUS_Y.gen-28}/>
-                    <Transformer x={gtX} y={BUS_Y.gen-18} label={`GSU-${i+1}`} voltages="18kV-13.8kV" id={`xfmr-gt${i}`} r={10}/>
-                    <Wire x1={gtX} y1={BUS_Y.gen-6} x2={gtX} y2={BUS_Y.gen-4}/>
-                    <Breaker x={gtX} y={BUS_Y.gen-2} id={`cb-gt${i}`} label={`GT${i+1} CB`}/>
+                {/* 138kV Bus for F-Frame */}
+                {hasF && <Bus x={busStartX+busWidth*0.3} y={BUS_138} width={busWidth*0.4} color="#f0c040" label="138 kV" thickness={4}/>}
+
+                {/* 13.8kV Bus for Recip */}
+                {hasR && <Bus x={busStartX+busWidth*0.2} y={BUS_GEN} width={busWidth*0.6} color={COLORS.bus13} label="13.8 kV" thickness={3}/>}
+
+                {/* H-Frame generators - connect to 345kV */}
+                {hasH && Array.from({length: Math.min(hCount, 3)}).map((_, i) => {
+                  const hx = busStartX + 80 + i * 100;
+                  return (
+                    <g key={`hframe-${i}`}>
+                      <Generator x={hx} y={BUS_345-65} label={`H-${i+1}`} mw={400} type="gas" id={`gen-h${i}`}/>
+                      <Wire x1={hx} y1={BUS_345-43} x2={hx} y2={BUS_345-25}/>
+                      <Transformer x={hx} y={BUS_345-15} label="GSU" voltages="18kV-345kV" id={`xfmr-h${i}`} r={10}/>
+                      <Wire x1={hx} y1={BUS_345-3} x2={hx} y2={BUS_345}/>
+                      <Breaker x={hx} y={BUS_345-1} id={`cb-h${i}`} label="345kV CB"/>
+                      <text x={hx} y={BUS_345-75} textAnchor="middle" fill={equipColors.hframe} fontSize={7} fontFamily={F.m}>H-FRAME 400MW</text>
+                    </g>
+                  );
+                })}
+
+                {/* Tie from 345kV to 34.5kV if H-frames exist */}
+                {hasH && (
+                  <g>
+                    <Wire x1={busStartX+busWidth*0.35} y1={BUS_345} x2={busStartX+busWidth*0.35} y2={BUS_345+20} color="#ff6b6b"/>
+                    <Transformer x={busStartX+busWidth*0.35} y={BUS_345+38} label="AUTO" voltages="345kV-34.5kV" id="xfmr-345-34"/>
+                    <Wire x1={busStartX+busWidth*0.35} y1={BUS_345+54} x2={busStartX+busWidth*0.35} y2={BUS_Y.mv} color={COLORS.bus34}/>
                   </g>
-                );
-              })}
-            </g>
-          )}
+                )}
+
+                {/* F-Frame generators - connect to 138kV */}
+                {hasF && Array.from({length: Math.min(fCount, 5)}).map((_, i) => {
+                  const fx = busStartX + busWidth*0.35 + i * 80;
+                  return (
+                    <g key={`fframe-${i}`}>
+                      <Generator x={fx} y={BUS_138-65} label={`F-${i+1}`} mw={200} type="gas" id={`gen-f${i}`}/>
+                      <Wire x1={fx} y1={BUS_138-43} x2={fx} y2={BUS_138-25}/>
+                      <Transformer x={fx} y={BUS_138-15} label="GSU" voltages="13.8kV-138kV" id={`xfmr-f${i}`} r={10}/>
+                      <Wire x1={fx} y1={BUS_138-3} x2={fx} y2={BUS_138}/>
+                      <Breaker x={fx} y={BUS_138-1} id={`cb-f${i}`} label="138kV CB"/>
+                      <text x={fx} y={BUS_138-75} textAnchor="middle" fill={equipColors.fframe} fontSize={7} fontFamily={F.m}>F-FRAME 200MW</text>
+                    </g>
+                  );
+                })}
+
+                {/* Tie from 138kV to 34.5kV if F-frames exist */}
+                {hasF && (
+                  <g>
+                    <Wire x1={busStartX+busWidth*0.65} y1={BUS_138} x2={busStartX+busWidth*0.65} y2={BUS_138+20} color="#f0c040"/>
+                    <Transformer x={busStartX+busWidth*0.65} y={BUS_138+38} label="TIE" voltages="138kV-34.5kV" id="xfmr-138-34"/>
+                    <Wire x1={busStartX+busWidth*0.65} y1={BUS_138+54} x2={busStartX+busWidth*0.65} y2={BUS_Y.mv} color={COLORS.bus34}/>
+                  </g>
+                )}
+
+                {/* Aero generators - connect directly to 34.5kV collection bus */}
+                {hasA && Array.from({length: Math.min(aCount, 8)}).map((_, i) => {
+                  const ax = busStartX + busWidth*0.1 + i * 60;
+                  return (
+                    <g key={`aero-${i}`}>
+                      <Generator x={ax} y={BUS_Y.mv-65} label={`A-${i+1}`} mw={50} type="gas" id={`gen-a${i}`}/>
+                      <Wire x1={ax} y1={BUS_Y.mv-43} x2={ax} y2={BUS_Y.mv-25}/>
+                      <Transformer x={ax} y={BUS_Y.mv-15} label="PAD" voltages="13.8kV-34.5kV" id={`xfmr-a${i}`} r={8}/>
+                      <Wire x1={ax} y1={BUS_Y.mv-5} x2={ax} y2={BUS_Y.mv}/>
+                      <Breaker x={ax} y={BUS_Y.mv-2} size={6} id={`cb-a${i}`} label=""/>
+                      {i===0 && <text x={ax+30} y={BUS_Y.mv-75} fill={equipColors.aero} fontSize={7} fontFamily={F.m}>AERO 50MW (fast start)</text>}
+                    </g>
+                  );
+                })}
+
+                {/* Tie from 34.5kV to 13.8kV if Recips exist */}
+                {hasR && (
+                  <g>
+                    <Wire x1={gasX} y1={BUS_Y.mv} x2={gasX} y2={BUS_Y.mv+20} color={COLORS.bus34}/>
+                    <Breaker x={gasX} y={BUS_Y.mv+14} id="cb-mv-gen" label="GEN TIE"/>
+                    <Transformer x={gasX} y={BUS_Y.mv+48} label="AUX" voltages="34.5kV-13.8kV" id="xfmr-aux"/>
+                    <Wire x1={gasX} y1={BUS_Y.mv+64} x2={gasX} y2={BUS_GEN} color={COLORS.bus13}/>
+                  </g>
+                )}
+
+                {/* Recip generators - connect to 13.8kV */}
+                {hasR && Array.from({length: Math.min(rCount, 10)}).map((_, i) => {
+                  const rx = busStartX + busWidth*0.25 + i * 55;
+                  return (
+                    <g key={`recip-${i}`}>
+                      <Generator x={rx} y={BUS_GEN-60} label={`R-${i+1}`} mw={20} type="gas" id={`gen-r${i}`}/>
+                      <Wire x1={rx} y1={BUS_GEN-38} x2={rx} y2={BUS_GEN}/>
+                      <Breaker x={rx} y={BUS_GEN-2} size={6} id={`cb-r${i}`} label=""/>
+                      {i===0 && <text x={rx+40} y={BUS_GEN-70} fill={equipColors.recip} fontSize={7} fontFamily={F.m}>RECIP 20MW (fastest start)</text>}
+                    </g>
+                  );
+                })}
+
+                {/* Equipment summary */}
+                <text x={busStartX+10} y={H-20} fill="#6B7280" fontSize={8} fontFamily={F.m}>
+                  Gas Mix: {hCount>0?`${hCount}×H-Frame `:""}
+                  {fCount>0?`${fCount}×F-Frame `:""}
+                  {aCount>0?`${aCount}×Aero `:""}
+                  {rCount>0?`${rCount}×Recip`:""}
+                  {gasMetrics?` | Wtd HR: ${gasMetrics.weightedHeatRate?.toFixed(1)} | Avg Start: ${gasMetrics.avgStartup?.toFixed(0)}min`:""}
+                </text>
+              </g>
+            );
+          })()}
 
           {/* DATA CENTER FEED */}
           <Bus x={dcCenterX-180} y={BUS_Y.dc} width={360} color={COLORS.busDC} label="12.47 kV" thickness={3}/>
@@ -614,6 +776,12 @@ export default function App() {
     SCEN.forEach(s => { o[s.id] = { dSolar: 0, dWind: 0, dGas: 0, dBattMW: 0, dBattMWh: 0 }; });
     return o;
   });
+  const [gasEquip, setGasEquip] = useState({ hframe: 0, fframe: 0, aero: 0, recip: 2 });
+  const updateGasEquip = useCallback((type, count) => setGasEquip(prev => ({...prev, [type]: Math.max(0, count)})), []);
+  const gasMetrics = useMemo(() => {
+    const totalMW = Object.entries(gasEquip).reduce((s,[t,c]) => s + c * (GAS_EQUIP[t]?.unitMW||0), 0);
+    return computeGasMetrics(gasEquip, totalMW);
+  }, [gasEquip]);
   const update = useCallback((k,v) => setP(prev=>({...prev,[k]:v})), []);
   const updateRel = useCallback((cfgId, key, val) => {
     setRelAdj(prev => ({ ...prev, [cfgId]: { ...prev[cfgId], [key]: val } }));
@@ -807,6 +975,7 @@ export default function App() {
             {key:"gasPipeline",label:"Gas Lateral",min:10,max:400,step:10,unit:"$/kW"},
             {key:"gasEPC",label:"EPC+Permit",min:30,max:500,step:10,unit:"$/kW"},
           ]}/>
+          <GasEquipPanel gasEquip={gasEquip} updateGasEquip={updateGasEquip} gasMetrics={gasMetrics}/>
           <CxP title="BATTERY" color="#2D8C6F" p={p} update={update} items={[
             {key:"battCells",label:"LFP Cells",min:50,max:400,step:10,unit:"$/kWh"},
             {key:"battBOP",label:"PCS/BOP",min:30,max:200,step:5,unit:"$/kWh"},
@@ -1179,7 +1348,7 @@ export default function App() {
             <div style={{display:"flex",gap:4,marginBottom:4}}>
               {SCEN.map(s=>(<button key={s.id} style={{...TS(sldCfg===s.id),borderColor:sldCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setSldCfg(s.id)}>{s.short}</button>))}
             </div>
-            <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p}/>
+            <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p} gasEquip={gasEquip} gasMetrics={gasMetrics}/>
           </>)}
 
 
