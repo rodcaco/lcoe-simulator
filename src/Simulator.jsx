@@ -453,6 +453,77 @@ export default function App() {
     setRelAdj(prev => ({ ...prev, [cfgId]: { ...prev[cfgId], [key]: val } }));
   }, []);
 
+  // Buildout phases: 10GW campus deployed over time
+  const [phases, setPhases] = useState([
+    { year: 0,  label: "Phase 1", gasMW: 2000, solarMW: 0,    windMW: 0,    battMW: 0,   battMWh: 0 },
+    { year: 1,  label: "Phase 2", gasMW: 2000, solarMW: 0,    windMW: 0,    battMW: 0,   battMWh: 0 },
+    { year: 2,  label: "Phase 3", gasMW: 1000, solarMW: 1000, windMW: 0,    battMW: 300, battMWh: 1200 },
+    { year: 3,  label: "Phase 4", gasMW: 0,    solarMW: 500,  windMW: 1500, battMW: 400, battMWh: 1600 },
+    { year: 5,  label: "Phase 5", gasMW: 0,    solarMW: 1500, windMW: 1500, battMW: 500, battMWh: 4000 },
+    { year: 7,  label: "Phase 6", gasMW: 0,    solarMW: 1000, windMW: 1000, battMW: 300, battMWh: 3000 },
+  ]);
+  const updatePhase = useCallback((idx, key, val) => {
+    setPhases(prev => prev.map((ph, i) => i === idx ? { ...ph, [key]: val } : ph));
+  }, []);
+
+  // Compute cumulative buildout metrics
+  const buildout = useMemo(() => {
+    const sC = p.solarModule + p.solarRacking + p.solarBOP + p.solarInterconnect + p.solarEPC + p.solarSoft;
+    const wC = p.windTSA + p.windFoundation + p.windBOP + p.windInterconnect + p.windEPC + p.windSoft;
+    const gC = p.gasTurbine + p.gasBOP + p.gasPipeline + p.gasElectrical + p.gasSCR + p.gasEPC + p.gasSoft;
+    const bC = p.battCells + p.battBOP + p.battEPC + p.battSite;
+    const fuelMarg = p.gasPrice * p.heatRate;
+    const CRF = crf(p.wacc, p.life);
+
+    let cumGas = 0, cumSolar = 0, cumWind = 0, cumBattMW = 0, cumBattMWh = 0, cumCapex = 0;
+    const snapshots = [];
+
+    for (let i = 0; i < phases.length; i++) {
+      const ph = phases[i];
+      cumGas += ph.gasMW; cumSolar += ph.solarMW; cumWind += ph.windMW;
+      cumBattMW += ph.battMW; cumBattMWh += ph.battMWh;
+
+      const totalGen = cumGas + cumSolar + cumWind;
+      const totalLoad = totalGen > 0 ? Math.min(10000, totalGen) : 0;
+      const annMWh = totalLoad * 8760;
+
+      // Phase capex (incremental)
+      const phCapex = (ph.solarMW * sC + ph.windMW * wC + ph.gasMW * gC) * 1000 +
+        ph.battMWh * bC * 1000 -
+        ph.solarMW * sC * 1000 * p.solarITC -
+        ph.battMWh * bC * 1000 * p.battITC;
+      cumCapex += phCapex;
+
+      // Blended generation fractions
+      const gasFrac = totalGen > 0 ? cumGas / totalGen : 0;
+      const solarFrac = totalGen > 0 ? cumSolar / totalGen : 0;
+      const windFrac = totalGen > 0 ? cumWind / totalGen : 0;
+
+      // Simplified blended LCOE at this snapshot
+      const annCapex = cumCapex * CRF;
+      const annOM = (cumSolar * p.solarOM + cumWind * p.windOM + cumGas * p.gasOMFixed + cumBattMW * p.battOM) * 1000 +
+        gasFrac * annMWh * p.gasOMVar;
+      const annFuel = gasFrac * annMWh * fuelMarg;
+      const annPTC = cumWind * p.windCF * 8760 * p.windPTC * Math.min(10, p.life) / p.life;
+
+      const lcoe = annMWh > 0 ? (annCapex + annOM + annFuel - annPTC) / annMWh : 0;
+      const lcoeFuel = annMWh > 0 ? annFuel / annMWh : 0;
+      const fuelPct = lcoe > 0 ? lcoeFuel / lcoe : 0;
+
+      // P10/P90 from gas vol
+      const p10 = lcoe - lcoeFuel + lcoeFuel * Math.max(0.3, 1 - 1.28 * p.gasVol);
+      const p90 = lcoe - lcoeFuel + lcoeFuel * (1 + 1.28 * p.gasVol);
+
+      snapshots.push({
+        phase: i, year: ph.year, label: ph.label,
+        cumGas, cumSolar, cumWind, cumBattMW, cumBattMWh, cumCapex, phCapex,
+        totalLoad, annMWh, gasFrac, solarFrac, windFrac,
+        lcoe, lcoeFuel, fuelPct, p10, p90, spread: p90 - p10,
+      });
+    }
+    return snapshots;
+  }, [p, phases]);
+
   // Compute base sizes + adjusted sizes + LCOE + dispatch
   const computed = useMemo(() => {
     const out = {};
@@ -545,8 +616,8 @@ export default function App() {
     <div style={{fontFamily:F.s,background:"#0C0F14",color:"#E8E6E1",minHeight:"100vh",padding:"20px 16px"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
       <div style={{marginBottom:20,borderBottom:"1px solid #1E2330",paddingBottom:12}}>
-        <h1 style={{fontSize:16,fontWeight:700,letterSpacing:"-0.02em",color:"#F0EDE8",margin:0,fontFamily:F.m}}>LCOE SIMULATOR v4</h1>
-        <div style={{fontSize:10,color:"#6B7280",marginTop:3,fontFamily:F.m}}>1 GW DC {"\u00B7"} 100% reliability baseline {"\u00B7"} redundancy tuning {"\u00B7"} single-line diagrams</div>
+        <h1 style={{fontSize:16,fontWeight:700,letterSpacing:"-0.02em",color:"#F0EDE8",margin:0,fontFamily:F.m}}>LCOE SIMULATOR v5</h1>
+        <div style={{fontSize:10,color:"#6B7280",marginTop:3,fontFamily:F.m}}>10 GW campus {"\u00B7"} phased buildout {"\u00B7"} gas-first glide path {"\u00B7"} hedge construction over time</div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:16}}>
@@ -591,7 +662,7 @@ export default function App() {
         {/* RIGHT */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-            {["overview","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"].map(t=>(
+            {["overview","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"].map(t=>(
               <button key={t} style={TS(tab===t)} onClick={()=>setTab(t)}>{t.toUpperCase()}</button>
             ))}
           </div>
@@ -628,6 +699,140 @@ export default function App() {
                 </div>);})}
             </div>
           </>)}
+
+
+          {/* ===== BUILDOUT ===== */}
+          {tab==="buildout"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {/* KPIs */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+                {[
+                  {l:"TARGET",v:"10 GW",c:"#E8E6E1"},
+                  {l:"ONLINE",v:`${((buildout[buildout.length-1]||{}).totalLoad||0)/1000>0?((buildout[buildout.length-1].totalLoad)/1000).toFixed(1):"0"} GW`,c:((buildout[buildout.length-1]||{}).totalLoad||0)>=10000?"#2D8C6F":"#E8A838"},
+                  {l:"BLENDED LCOE",v:`$${((buildout[buildout.length-1]||{}).lcoe||0).toFixed(1)}/MWh`,c:"#E8E6E1"},
+                  {l:"FUEL EXPOSURE",v:`${(((buildout[buildout.length-1]||{}).fuelPct||0)*100).toFixed(0)}%`,c:((buildout[buildout.length-1]||{}).fuelPct||0)>0.5?"#C24B4B":"#2D8C6F"},
+                  {l:"CUM CAPEX",v:fmt$((buildout[buildout.length-1]||{}).cumCapex||0),c:"#E8E6E1"},
+                ].map(m=>(
+                  <div key={m.l} style={{...PS,padding:10}}>
+                    <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,textTransform:"uppercase",letterSpacing:"0.05em"}}>{m.l}</div>
+                    <div style={{fontSize:18,fontWeight:700,fontFamily:F.m,color:m.c,lineHeight:1.2}}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Capacity stack chart */}
+              <div style={PS}>
+                <div style={SL}>CUMULATIVE CAPACITY BY SOURCE</div>
+                <svg viewBox="0 0 720 180" style={{width:"100%",height:"auto"}}>
+                  {[0,2500,5000,7500,10000].map(mw=>{const y=16+148-mw/12000*148;return(<g key={mw}><line x1={50} x2={704} y1={y} y2={y} stroke="#1E2330" strokeWidth={0.5}/><text x={46} y={y+3} textAnchor="end" fill="#6B7280" fontSize={7} fontFamily={F.m}>{mw/1000}GW</text></g>);})}
+                  <line x1={50} x2={704} y1={16+148-10000/12000*148} y2={16+148-10000/12000*148} stroke="#E8A838" strokeWidth={1} strokeDasharray="4,3"/>
+                  {buildout.map((snap,i)=>{
+                    const maxYr=Math.max(10,...buildout.map(s=>s.year+2));
+                    const cx=50+(snap.year/maxYr)*654;
+                    const bw=Math.max(18,654/maxYr*1.2);
+                    let cumH=0;
+                    return(<g key={i}>
+                      {[{mw:snap.cumGas,c:"#C24B4B"},{mw:snap.cumWind,c:"#3D7EC7"},{mw:snap.cumSolar,c:"#D4A026"}].map((l,j)=>{
+                        const h=l.mw/12000*148;const yy=16+148-cumH-h;cumH+=h;
+                        return h>0.5?<rect key={j} x={cx-bw/2} y={yy} width={bw} height={h} fill={l.c} fillOpacity={0.7} rx={1}/>:null;
+                      })}
+                      {snap.cumBattMWh>0&&<rect x={cx-bw/2-3} y={16+148-cumH-3} width={3} height={6} fill="#2D8C6F" rx={1}/>}
+                      <text x={cx} y={176} textAnchor="middle" fill="#9CA3AF" fontSize={7} fontFamily={F.m}>Yr{snap.year}</text>
+                    </g>);
+                  })}
+                  {[{c:"#C24B4B",l:"Gas"},{c:"#3D7EC7",l:"Wind"},{c:"#D4A026",l:"Solar"},{c:"#2D8C6F",l:"Batt"}].map((l,i)=>(<g key={l.l} transform={`translate(${50+i*70},10)`}><rect x={0} y={-3} width={6} height={6} fill={l.c} rx={1}/><text x={9} y={2} fill="#9CA3AF" fontSize={7} fontFamily={F.m}>{l.l}</text></g>))}
+                </svg>
+              </div>
+
+              {/* LCOE glide path */}
+              <div style={PS}>
+                <div style={SL}>BLENDED LCOE & FUEL EXPOSURE GLIDE PATH</div>
+                {(()=>{
+                  const maxL=Math.max(1,...buildout.map(s=>(s.p90||s.lcoe||1)))*1.15;
+                  const maxYr=Math.max(10,...buildout.map(s=>s.year+2));
+                  const xP=yr=>50+(yr/maxYr)*654;
+                  const yL=v=>16+148-((v||0)/maxL)*148;
+                  const yF=f=>16+148-(f||0)*148;
+                  return(
+                    <svg viewBox="0 0 720 180" style={{width:"100%",height:"auto"}}>
+                      {[0,.25,.5,.75,1].map(f=>(<g key={f}><line x1={50} x2={704} y1={yL(maxL*f)} y2={yL(maxL*f)} stroke="#1E2330" strokeWidth={0.5}/><text x={46} y={yL(maxL*f)+3} textAnchor="end" fill="#6B7280" fontSize={7} fontFamily={F.m}>${(maxL*f).toFixed(0)}</text></g>))}
+                      {buildout.length>1&&<path d={buildout.map((s,i)=>`${i===0?"M":"L"}${xP(s.year).toFixed(1)},${yL(s.p10||0).toFixed(1)}`).join("")+[...buildout].reverse().map(s=>`L${xP(s.year).toFixed(1)},${yL(s.p90||0).toFixed(1)}`).join("")+"Z"} fill="#8B5DB8" fillOpacity={0.1}/>}
+                      <path d={buildout.map((s,i)=>`${i===0?"M":"L"}${xP(s.year).toFixed(1)},${yL(s.lcoe||0).toFixed(1)}`).join("")} fill="none" stroke="#E8E6E1" strokeWidth={2}/>
+                      {buildout.map((s,i)=>(<g key={i}><circle cx={xP(s.year)} cy={yL(s.lcoe||0)} r={4} fill="#E8E6E1" stroke="#0C0F14" strokeWidth={1.5}/><text x={xP(s.year)} y={yL(s.lcoe||0)-8} textAnchor="middle" fill="#E8E6E1" fontSize={8} fontFamily={F.m} fontWeight="600">${(s.lcoe||0).toFixed(0)}</text></g>))}
+                      <path d={buildout.map((s,i)=>`${i===0?"M":"L"}${xP(s.year).toFixed(1)},${yF(s.fuelPct||0).toFixed(1)}`).join("")} fill="none" stroke="#C24B4B" strokeWidth={1.5} strokeDasharray="4,3"/>
+                      {buildout.map((s,i)=>(<g key={`f${i}`}><circle cx={xP(s.year)} cy={yF(s.fuelPct||0)} r={3} fill="#C24B4B"/><text x={xP(s.year)+10} y={yF(s.fuelPct||0)+3} fill="#C24B4B" fontSize={7} fontFamily={F.m}>{((s.fuelPct||0)*100).toFixed(0)}%</text></g>))}
+                      {buildout.map((s,i)=>(<text key={i} x={xP(s.year)} y={176} textAnchor="middle" fill="#9CA3AF" fontSize={7} fontFamily={F.m}>Yr{s.year}</text>))}
+                      <text x={704} y={24} textAnchor="end" fill="#C24B4B" fontSize={7} fontFamily={F.m}>Fuel%</text>
+                      <text x={46} y={24} textAnchor="end" fill="#E8E6E1" fontSize={7} fontFamily={F.m}>$/MWh</text>
+                    </svg>
+                  );
+                })()}
+                <div style={{display:"flex",gap:14,marginTop:4,fontSize:8,fontFamily:F.m,color:"#6B7280"}}>
+                  <span style={{color:"#E8E6E1"}}>{"\u25CF"} LCOE</span>
+                  <span style={{color:"#C24B4B"}}>-- Fuel%</span>
+                  <span style={{color:"#8B5DB8",opacity:0.5}}>{"\u25A0"} P10-P90</span>
+                </div>
+              </div>
+
+              {/* Phase editor */}
+              <div style={PS}>
+                <div style={SL}>PHASE EDITOR {"\u2014"} INCREMENTAL MW PER PHASE</div>
+                <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:8}}>Drag sliders to adjust each phase. Charts update live.</div>
+                {phases.map((ph,i)=>{
+                  const snap=buildout[i]||{};
+                  return(
+                    <div key={i} style={{marginBottom:14,paddingBottom:12,borderBottom:"1px solid #1E2330"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <span style={{fontSize:11,fontFamily:F.m,color:"#E8E6E1",fontWeight:600}}>{ph.label} (Yr {ph.year})</span>
+                        <div style={{display:"flex",gap:14,fontSize:9,fontFamily:F.m}}>
+                          <span style={{color:"#E8E6E1"}}>{((snap.totalLoad||0)/1000).toFixed(1)} GW</span>
+                          <span style={{color:"#E8E6E1"}}>${(snap.lcoe||0).toFixed(1)}/MWh</span>
+                          <span style={{color:(snap.fuelPct||0)>0.5?"#C24B4B":"#2D8C6F"}}>{((snap.fuelPct||0)*100).toFixed(0)}% fuel</span>
+                        </div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
+                        <div>
+                          <div style={{fontSize:8,color:"#C24B4B",fontFamily:F.m}}>+Gas: {ph.gasMW} MW</div>
+                          <input type="range" min={0} max={4000} step={100} value={ph.gasMW} onChange={e=>updatePhase(i,"gasMW",parseInt(e.target.value))} style={{width:"100%",height:2,accentColor:"#C24B4B"}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:8,color:"#D4A026",fontFamily:F.m}}>+Solar: {ph.solarMW} MW</div>
+                          <input type="range" min={0} max={4000} step={100} value={ph.solarMW} onChange={e=>updatePhase(i,"solarMW",parseInt(e.target.value))} style={{width:"100%",height:2,accentColor:"#D4A026"}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:8,color:"#3D7EC7",fontFamily:F.m}}>+Wind: {ph.windMW} MW</div>
+                          <input type="range" min={0} max={4000} step={100} value={ph.windMW} onChange={e=>updatePhase(i,"windMW",parseInt(e.target.value))} style={{width:"100%",height:2,accentColor:"#3D7EC7"}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:8,color:"#2D8C6F",fontFamily:F.m}}>+Batt: {ph.battMW} MW</div>
+                          <input type="range" min={0} max={2000} step={50} value={ph.battMW} onChange={e=>updatePhase(i,"battMW",parseInt(e.target.value))} style={{width:"100%",height:2,accentColor:"#2D8C6F"}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:8,color:"#2D8C6F",fontFamily:F.m}}>+Batt: {(ph.battMWh/1000).toFixed(1)} GWh</div>
+                          <input type="range" min={0} max={8000} step={200} value={ph.battMWh} onChange={e=>updatePhase(i,"battMWh",parseInt(e.target.value))} style={{width:"100%",height:2,accentColor:"#2D8C6F"}}/>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button onClick={()=>setPhases(prev=>[...prev,{year:(prev[prev.length-1]?.year||0)+2,label:`Phase ${prev.length+1}`,gasMW:0,solarMW:500,windMW:500,battMW:200,battMWh:800}])}
+                  style={{marginTop:4,padding:"4px 12px",fontSize:9,fontFamily:F.m,background:"#1E2330",color:"#9CA3AF",border:"1px solid #2A3040",borderRadius:3,cursor:"pointer"}}>+ ADD PHASE</button>
+              </div>
+
+              {/* Insight */}
+              <div style={{...PS,borderColor:"#2A3040"}}>
+                <div style={SL}>BUILDOUT STRATEGY</div>
+                <div style={{fontSize:11,lineHeight:1.7,color:"#D1D5DB"}}>
+                  Phase 1 at <span style={{fontFamily:F.m}}>${(buildout[0]?.lcoe||0).toFixed(0)}/MWh</span> with{" "}
+                  <span style={{color:"#C24B4B"}}>{((buildout[0]?.fuelPct||0)*100).toFixed(0)}% fuel</span> {"\u2014"} gas-first for speed.
+                  By Phase {buildout.length}: <span style={{fontFamily:F.m}}>${((buildout[buildout.length-1]||{}).lcoe||0).toFixed(0)}/MWh</span>,{" "}
+                  fuel at <span style={{color:"#2D8C6F"}}>{(((buildout[buildout.length-1]||{}).fuelPct||0)*100).toFixed(0)}%</span>.
+                  P10-P90 narrows from ${(buildout[0]?.spread||0).toFixed(0)} to ${((buildout[buildout.length-1]||{}).spread||0).toFixed(0)}/MWh.
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {/* ===== BREAKDOWN ===== */}
           {tab==="breakdown"&&(
