@@ -1043,6 +1043,7 @@ export default function App() {
             </div>
             <div style={PS}>
               <div style={SL}>TORNADO SENSITIVITY {"\u2014"} {SCEN.find(s=>s.id===torCfg)?.short}</div>
+              <div style={{fontSize:9,color:"#6B7280",fontFamily:F.m,marginBottom:10}}>Shows how ± changes in each input affect LCOE. <span style={{color:"#2D8C6F"}}>Green = lower cost</span>, <span style={{color:"#C24B4B"}}>Red = higher cost</span>. Sorted by impact.</div>
               {(()=>{const bL=results[torCfg].lcoe;const sc=SCEN.find(s=>s.id===torCfg);
                 const sorted=tornado.map(v=>{const lo=v.loR[torCfg].lcoe,hi=v.hiR[torCfg].lcoe;return{...v,lo,hi,imp:Math.abs(hi-lo)};}).sort((a,b)=>b.imp-a.imp);
                 const mI=Math.max(...sorted.map(s=>s.imp));
