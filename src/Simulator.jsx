@@ -439,6 +439,14 @@ function SLD({configId, sz, p}) {
 export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
+  const [tabOrder, setTabOrder] = useState(() => {
+    const saved = localStorage.getItem("lcoe_tabOrder");
+    return saved ? JSON.parse(saved) : ["overview","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
+  });
+  const [draggedTab, setDraggedTab] = useState(null);
+  const handleTabDragStart = (e, t) => { setDraggedTab(t); e.dataTransfer.effectAllowed = "move"; };
+  const handleTabDragOver = (e, t) => { e.preventDefault(); if (draggedTab && draggedTab !== t) { const newOrder = [...tabOrder]; const fromIdx = newOrder.indexOf(draggedTab); const toIdx = newOrder.indexOf(t); newOrder.splice(fromIdx, 1); newOrder.splice(toIdx, 0, draggedTab); setTabOrder(newOrder); localStorage.setItem("lcoe_tabOrder", JSON.stringify(newOrder)); } };
+  const handleTabDragEnd = () => setDraggedTab(null);
   const [torCfg, setTorCfg] = useState("gu");
   const [profCfg, setProfCfg] = useState("swgb");
   const [sldCfg, setSldCfg] = useState("swgb");
@@ -662,8 +670,8 @@ export default function App() {
         {/* RIGHT */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-            {["overview","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"].map(t=>(
-              <button key={t} style={TS(tab===t)} onClick={()=>setTab(t)}>{t.toUpperCase()}</button>
+            {tabOrder.map(t=>(
+              <button key={t} draggable style={{...TS(tab===t), cursor: draggedTab ? "grabbing" : "grab", opacity: draggedTab === t ? 0.5 : 1}} onClick={()=>setTab(t)} onDragStart={(e)=>handleTabDragStart(e,t)} onDragOver={(e)=>handleTabDragOver(e,t)} onDragEnd={handleTabDragEnd}>{t.toUpperCase()}</button>
             ))}
           </div>
 
