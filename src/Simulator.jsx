@@ -1421,6 +1421,7 @@ export default function App() {
                       <div style={{position:"absolute",left:"50%",top:0,width:1,height:18,background:"#2A3040"}}/>
                       <div style={{position:"absolute",left:mn<0?`${50+mn*sc2/2}%`:"50%",width:`${Math.abs(mn)*sc2/2}%`,height:18,background:mn<0?"#2D8C6F80":"#C24B4B80",borderRadius:2,top:0}}/>
                       <div style={{position:"absolute",left:mx<0?`${50+mx*sc2/2}%`:"50%",width:`${Math.abs(mx)*sc2/2}%`,height:18,background:mx>0?"#C24B4B80":"#2D8C6F80",borderRadius:2,top:0}}/>
+                      <div style={{position:"absolute",left:"50%",top:0,transform:"translateX(-50%)",height:18,display:"flex",alignItems:"center",fontSize:8,fontFamily:F.m,color:"#E8E6E1",fontWeight:600,pointerEvents:"none"}}>${bL.toFixed(1)}</div>
                     </div>
                     <div style={{width:45,fontSize:8,fontFamily:F.m,color:"#6B7280",flexShrink:0}}>{fV(v.hiVal,v.u)}</div>
                     <div style={{width:55,fontSize:9,fontFamily:F.m,color:sc.color,textAlign:"right",flexShrink:0,fontWeight:600}}>{"\u00B1"}${(v.imp/2).toFixed(1)}</div>
