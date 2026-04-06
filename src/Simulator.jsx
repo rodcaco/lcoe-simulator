@@ -684,7 +684,7 @@ export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
   const [tabOrder, setTabOrder] = useState(() => {
-    const defaultOrder = ["overview","thesis","correlation","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
+    const defaultOrder = ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","solar-wind corr"];
     const saved = localStorage.getItem("lcoe_tabOrder_v2");
     if (!saved) return defaultOrder;
     const parsed = JSON.parse(saved);
@@ -974,6 +974,29 @@ export default function App() {
                     {r.spread>0.1&&<div style={{position:"absolute",left:`${(r.p90/maxLcoe)*100}%`,top:2,fontSize:7,color:s.color,fontFamily:F.m,transform:"translateX(3px)"}}>P90:${r.p90.toFixed(0)}</div>}
                   </div>
                 </div>);})}
+            </div>
+            {/* Sizing table */}
+            <div style={PS}>
+              <div style={SL}>INFRASTRUCTURE SIZING</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:F.m}}>
+                <thead><tr style={{borderBottom:"1px solid #2A3040"}}>
+                  {["Config","Solar MW","Wind MW","Gas MW","Batt MW","Batt GWh","Overbuild","Capex","Reliability"].map(h=>
+                    <th key={h} style={{padding:"6px 4px",textAlign:"right",color:"#6B7280",fontWeight:500,fontSize:8}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{SCEN.map(s=>{const r=results[s.id],sz=computed[s.id].sz,d=computed[s.id].disp.stats;return(
+                  <tr key={s.id} style={{borderBottom:"1px solid #1E2330"}}>
+                    <td style={{padding:"6px 4px",color:s.color,fontWeight:600}}>{s.short}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.solarMW?"#E8E6E1":"#2A3040"}}>{sz.solarMW?sz.solarMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.windMW?"#E8E6E1":"#2A3040"}}>{sz.windMW?sz.windMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.gasMW?"#E8E6E1":"#2A3040"}}>{sz.gasMW?sz.gasMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMW?"#E8E6E1":"#2A3040"}}>{sz.battMW?sz.battMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMWh?"#E8E6E1":"#2A3040"}}>{sz.battMWh?(sz.battMWh/1000).toFixed(1):"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}>{r.overbuild.toFixed(1)}x</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",fontWeight:600}}>{fmt$(r.netCapex)}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</td>
+                  </tr>);})}
+                </tbody>
+              </table>
             </div>
           </>)}
 
@@ -1508,32 +1531,6 @@ export default function App() {
             })()}
           </>)}
 
-          {/* ===== SIZING ===== */}
-          {tab==="sizing"&&(
-            <div style={PS}>
-              <div style={SL}>INFRASTRUCTURE SIZING {"\u2014"} 100% RELIABLE</div>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:F.m}}>
-                <thead><tr style={{borderBottom:"1px solid #2A3040"}}>
-                  {["Config","Solar MW","Wind MW","Gas MW","Batt MW","Batt GWh","Overbuild","Capex","Reliability"].map(h=>
-                    <th key={h} style={{padding:"6px 4px",textAlign:"right",color:"#6B7280",fontWeight:500,fontSize:8}}>{h}</th>)}
-                </tr></thead>
-                <tbody>{SCEN.map(s=>{const r=results[s.id],sz=computed[s.id].sz,d=computed[s.id].disp.stats;return(
-                  <tr key={s.id} style={{borderBottom:"1px solid #1E2330"}}>
-                    <td style={{padding:"6px 4px",color:s.color,fontWeight:600}}>{s.short}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.solarMW?"#E8E6E1":"#2A3040"}}>{sz.solarMW?sz.solarMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.windMW?"#E8E6E1":"#2A3040"}}>{sz.windMW?sz.windMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.gasMW?"#E8E6E1":"#2A3040"}}>{sz.gasMW?sz.gasMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMW?"#E8E6E1":"#2A3040"}}>{sz.battMW?sz.battMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMWh?"#E8E6E1":"#2A3040"}}>{sz.battMWh?(sz.battMWh/1000).toFixed(1):"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right"}}>{r.overbuild.toFixed(1)}x</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",fontWeight:600}}>{fmt$(r.netCapex)}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</td>
-                  </tr>);})}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* ===== THESIS ===== */}
           {tab==="thesis"&&(<>
             <div style={PS}>
@@ -1544,46 +1541,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* The Infrastructure Table - The Core Insight */}
+            {/* Key Observations */}
             <div style={PS}>
-              <div style={SL}>INFRASTRUCTURE REQUIREMENTS — THE NUMBERS THAT MATTER</div>
-              <table style={{width:"100%", borderCollapse:"collapse", fontSize:10, fontFamily:F.m, marginBottom:12}}>
-                <thead>
-                  <tr style={{borderBottom:"2px solid #2A3040", background:"#12151C"}}>
-                    <th style={{padding:"10px 6px", textAlign:"left", color:"#9CA3AF", fontSize:9}}>Configuration</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Solar MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Wind MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Gas MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Battery MWh</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#a78bfa", fontSize:9}}>Overbuild</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9}}>Net Capex</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9, fontWeight:700}}>LCOE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {SCEN.map((s,i) => {
-                    const sz = computed[s.id].sz;
-                    const r = results[s.id];
-                    return (
-                      <tr key={s.id} style={{borderBottom:"1px solid #1E2330", background: i%2===0 ? "transparent" : "#0f1115"}}>
-                        <td style={{padding:"10px 6px", color:s.color, fontWeight:600}}>{s.name}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.solarMW?"#eab308":"#333"}}>{sz.solarMW ? sz.solarMW.toLocaleString() : "—"}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.windMW?"#3b82f6":"#333"}}>{sz.windMW ? sz.windMW.toLocaleString() : "—"}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.gasMW?"#ef4444":"#333"}}>{sz.gasMW ? sz.gasMW.toLocaleString() : "—"}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.battMWh?"#10b981":"#333"}}>{sz.battMWh ? sz.battMWh.toLocaleString() : "—"}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:"#a78bfa"}}>{r.overbuild.toFixed(1)}x</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF"}}>{fmt$(r.netCapex)}</td>
-                        <td style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontWeight:700, fontSize:12}}>${r.lcoe.toFixed(1)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Key Observations from the Table */}
-            <div style={PS}>
-              <div style={SL}>WHAT THE TABLE REVEALS</div>
+              <div style={SL}>KEY INSIGHTS</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
 
                 <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:16}}>
@@ -2105,35 +2065,8 @@ export default function App() {
 
           </>)}
 
-          {/* ===== SIZING ===== */}
-          {tab==="sizing"&&(
-            <div style={PS}>
-              <div style={SL}>INFRASTRUCTURE SIZING {"\u2014"} 100% RELIABLE</div>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:F.m}}>
-                <thead><tr style={{borderBottom:"1px solid #2A3040"}}>
-                  {["Config","Solar MW","Wind MW","Gas MW","Batt MW","Batt GWh","Overbuild","Capex","Reliability"].map(h=>
-                    <th key={h} style={{padding:"6px 4px",textAlign:"right",color:"#6B7280",fontWeight:500,fontSize:8}}>{h}</th>)}
-                </tr></thead>
-                <tbody>{SCEN.map(s=>{const r=results[s.id],sz=computed[s.id].sz,d=computed[s.id].disp.stats;return(
-                  <tr key={s.id} style={{borderBottom:"1px solid #1E2330"}}>
-                    <td style={{padding:"6px 4px",color:s.color,fontWeight:600}}>{s.short}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.solarMW?"#E8E6E1":"#2A3040"}}>{sz.solarMW?sz.solarMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.windMW?"#E8E6E1":"#2A3040"}}>{sz.windMW?sz.windMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.gasMW?"#E8E6E1":"#2A3040"}}>{sz.gasMW?sz.gasMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMW?"#E8E6E1":"#2A3040"}}>{sz.battMW?sz.battMW.toLocaleString():"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMWh?"#E8E6E1":"#2A3040"}}>{sz.battMWh?(sz.battMWh/1000).toFixed(1):"\u2014"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right"}}>{r.overbuild.toFixed(1)}x</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",fontWeight:600}}>{fmt$(r.netCapex)}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right",color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</td>
-                  </tr>);})}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-
-          {/* ===== CORRELATION ===== */}
-          {tab==="correlation"&&(<>
+          {/* ===== SOLAR-WIND CORR ===== */}
+          {tab==="solar-wind corr"&&(<>
             <div style={PS}>
               <div style={SL}>WIND-SOLAR DIURNAL CORRELATION</div>
               <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, marginBottom:16}}>
