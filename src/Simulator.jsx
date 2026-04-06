@@ -2348,25 +2348,115 @@ export default function App() {
 
             {/* Methodology */}
             <div style={PS}>
-              <div style={SL}>METHODOLOGY</div>
+              <div style={SL}>METHODOLOGY {"&"} ASSUMPTIONS</div>
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
                 <p style={{marginBottom:12}}>
                   This tool models <b style={{color:"#E8E6E1"}}>yearly-averaged hourly</b> capacity factor profiles for wind and solar resources
-                  in the western Oklahoma / panhandle corridor. Profiles are synthetic approximations calibrated to published empirical data.
+                  in the western Oklahoma / panhandle corridor. Profiles are synthetic approximations calibrated to published empirical data —
+                  they are not raw hourly timeseries from any single year or site. Users should treat outputs as directional for portfolio sizing
+                  and complementarity analysis, not as bankable energy yield estimates.
                 </p>
+
+                <p style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Wind diurnal profile</b></p>
                 <p style={{marginBottom:12}}>
-                  <b style={{color:"#E8E6E1"}}>Wind profile:</b> Derived from the diurnal pattern of the U.S. Southern Great Plains low-level jet (LLJ),
-                  where hub-height winds peak overnight (~22:00-04:00 CST) and trough midday (~12:00-15:00 CST).
-                  Default peak CF of 53% based on DOE Plains {"&"} Eastern Clean Line analysis for Oklahoma panhandle.
+                  The 24-hour wind shape vector is derived from the diurnal pattern characteristic of the U.S. Southern Great Plains low-level jet (LLJ),
+                  where hub-height winds peak overnight (~22:00–04:00 CST) and trough midday (~12:00–15:00 CST). This pattern is well-documented across
+                  the Oklahoma panhandle, West Texas, and western Kansas corridors. Default peak CF of 53% is based on the DOE Plains {"&"} Eastern
+                  Clean Line levelized cost analysis assumption for Oklahoma panhandle wind resources.<sup>1</sup> The 30–45% statewide range reflects
+                  fleet-wide averages inclusive of older, shorter turbines.<sup>2</sup> Modern turbines at 140m+ hub heights in the panhandle corridor
+                  can achieve 48–55% net CF.<sup>3</sup>
                 </p>
+
+                <p style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Solar diurnal profile</b></p>
                 <p style={{marginBottom:12}}>
-                  <b style={{color:"#E8E6E1"}}>Solar profile:</b> Modeled as Gaussian curve centered at 13:00 CST, truncated before 06:00 and after 20:00.
-                  Default peak CF of 25% reflects western Oklahoma GHI of ~5.0-5.5 kWh/m²/day for fixed-tilt PV.
+                  Solar CF is modeled as a Gaussian curve centered at 13:00 CST (accounting for Oklahoma's position within the Central time zone) with
+                  a standard deviation of 4.5 hours, truncated to zero before 06:00 and after 20:00. Default peak CF of 25% reflects western Oklahoma
+                  GHI of ~5.0–5.5 kWh/m²/day,<sup>4</sup> yielding annual CFs in the 22–26% range for fixed-tilt PV. Single-axis tracking would increase
+                  this to ~27–32%.
                 </p>
-                <p>
-                  <b style={{color:"#E8E6E1"}}>DC load:</b> Set at 40% of total nameplate capacity as proxy for flat 24/7 data center load.
+
+                <p style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Correlation methodology</b></p>
+                <p style={{marginBottom:12}}>
+                  Pearson correlation coefficient (r) is computed across the 24 hourly wind and solar CF values. This captures the <i>average diurnal</i>
+                  complementarity only. Actual hourly correlations on any given day will vary significantly due to weather — frontal systems, cloud cover,
+                  and wind drought events can produce positive correlations (both resources low simultaneously). Published research shows hourly wind-solar
+                  correlations are weakest (near zero or weakly negative), while monthly/seasonal correlations are more strongly negative.<sup>5, 6</sup>
                 </p>
+
+                <p style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>DC load assumption</b></p>
+                <p style={{marginBottom:12}}>
+                  The DC load line is set at 40% of total combined nameplate capacity (wind + solar). This is a rough proxy representing a flat 24/7 data
+                  center load sized to approximately match annual energy production from the renewable portfolio.
+                </p>
+
+                <p style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Key limitations</b></p>
+                <ul style={{marginBottom:12, paddingLeft:16, listStyleType:"disc"}}>
+                  <li>Profiles are yearly averages — seasonal variation (stronger wind in spring, weaker in summer; stronger solar in summer) is smoothed out</li>
+                  <li>Multi-day wind/solar drought events (3–7+ day calm/cloudy periods) are not represented in averaged profiles</li>
+                  <li>No curtailment, transmission constraints, or wake losses modeled</li>
+                  <li>No battery storage or gas backup dispatch modeled</li>
+                  <li>Solar profile assumes fixed-tilt; single-axis tracking would widen and flatten the curve</li>
+                </ul>
               </div>
+            </div>
+
+            {/* Sources */}
+            <div style={PS}>
+              <div style={SL}>SOURCES {"&"} DATABASES</div>
+              <ol style={{fontSize:9, color:"#6B7280", fontFamily:F.m, lineHeight:1.9, paddingLeft:16}}>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>U.S. Department of Energy</b>, Plains {"&"} Eastern Clean Line Levelized Cost Analysis, Appendix 6-B (2015). Oklahoma panhandle wind CF assumption of 53%.
+                  <br/><a href="https://www.energy.gov/sites/default/files/2015/04/f22/CleanLinePt2-Appendix-6-B.pdf" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>energy.gov — Plains {"&"} Eastern Appendix 6-B</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Oklahoma Historical Society</b>, "Wind Energy," Encyclopedia of Oklahoma History and Culture (2019). Statewide CF range of 30–45%.
+                  <br/><a href="https://www.okhistory.org/publications/enc/entry?entry=WI085" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>okhistory.org — Wind Energy</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>U.S. DOE / Lawrence Berkeley National Laboratory</b>, Land-Based Wind Market Report: 2024 Edition. National fleet-wide CF of 33.5% (2023); plants built in 2022 achieving 38.2%.
+                  <br/><a href="https://www.energy.gov/cmei/systems/land-based-wind-market-report-2024-edition" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>energy.gov — Wind Market Report 2024</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>NREL National Solar Radiation Database (NSRDB)</b>, PSM v3. GHI data for Oklahoma (~4.7–5.5 kWh/m²/day west-to-east gradient).
+                  <br/><a href="https://nsrdb.nrel.gov/" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>nsrdb.nrel.gov</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Monforti-Ferrario et al.</b> (2017), "Local complementarity of wind and solar energy resources over Europe," <i>J. Applied Meteorology and Climatology</i>, 56(1).
+                  <br/><a href="https://journals.ametsoc.org/view/journals/apme/56/1/jamc-d-16-0031.1.xml" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>AMS Journals — Monforti-Ferrario 2017</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Jurasz et al.</b> (2021), "Complementarity and 'Resource Droughts' of Solar and Wind Energy in Poland," <i>Energies</i>, 14(4), 1118.
+                  <br/><a href="https://www.mdpi.com/1996-1073/14/4/1118" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>MDPI Energies — Jurasz 2021</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Rhodes et al.</b> (2018), "Assessing solar and wind complementarity in Texas," <i>Sustainable Energy Research</i>, 5(1). Diurnal wind-solar profiles and Pearson correlations.
+                  <br/><a href="https://sustainenergyres.springeropen.com/articles/10.1186/s40807-018-0054-3" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>Springer — Rhodes 2018</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>NREL Wind Integration National Dataset (WIND) Toolkit</b>. Hourly wind speed and modeled power output at 126,000+ sites across the continental U.S.
+                  <br/><a href="https://www.nrel.gov/grid/wind-toolkit.html" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>nrel.gov — WIND Toolkit</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>U.S. EIA</b>, "U.S. wind generation falls into regional patterns by season" (2022). Lower Plains (TX, OK, KS, NM) seasonal capacity factor patterns.
+                  <br/><a href="https://www.eia.gov/todayinenergy/detail.php?id=54819" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>eia.gov — Regional wind patterns</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>S{"&"}P Global Market Intelligence</b>, "Over 16 GW of planned wind capacity in SPP supported by robust financial outlook" (2024). Oklahoma fleet-average wind CF of 41%.
+                  <br/><a href="https://www.spglobal.com/market-intelligence/en/news-insights/research/over-16-gw-of-planned-wind-capacity-in-spp-supported-by-robust-financial-outlook" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>S{"&"}P Global — SPP Wind Outlook</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Lazard</b>, Levelized Cost of Energy+ (LCOE+), v17/v18 (2024). Onshore wind + storage LCOE: $45–133/MWh; standalone onshore wind: $27–73/MWh.
+                  <br/><a href="https://www.lazard.com/research-insights/levelized-cost-of-energyplus/" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>lazard.com — LCOE+</a>
+                </li>
+                <li style={{marginBottom:8}}>
+                  <b style={{color:"#9CA3AF"}}>Windpower Monthly</b>, "Gaining a better understanding of capacity factor, productivity and efficiency" (2013). Relationship between specific rating and capacity factor.
+                  <br/><a href="https://www.windpowermonthly.com/article/1163492" target="_blank" rel="noopener" style={{color:"#3b82f6"}}>windpowermonthly.com</a>
+                </li>
+              </ol>
+              <p style={{fontSize:9, color:"#4B5563", marginTop:16, fontStyle:"italic"}}>
+                Profiles are synthetic approximations, not site-specific energy yield assessments. For bankable estimates, use hourly timeseries from
+                NREL WIND Toolkit / NSRDB with site-specific turbine power curves and NREL PVWatts / System Advisor Model (SAM).
+              </p>
             </div>
           </>)}
 
