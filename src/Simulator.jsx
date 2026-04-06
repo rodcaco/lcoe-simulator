@@ -684,8 +684,18 @@ export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
   const [tabOrder, setTabOrder] = useState(() => {
+    const defaultOrder = ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
     const saved = localStorage.getItem("lcoe_tabOrder");
-    return saved ? JSON.parse(saved) : ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
+    if (!saved) return defaultOrder;
+    const parsed = JSON.parse(saved);
+    // Ensure new tabs are added if missing from saved order
+    const missing = defaultOrder.filter(t => !parsed.includes(t));
+    if (missing.length > 0) {
+      const updated = [...parsed.slice(0,1), ...missing, ...parsed.slice(1)];
+      localStorage.setItem("lcoe_tabOrder", JSON.stringify(updated));
+      return updated;
+    }
+    return parsed;
   });
   const [draggedTab, setDraggedTab] = useState(null);
   const handleTabDragStart = (e, t) => { setDraggedTab(t); e.dataTransfer.effectAllowed = "move"; };
