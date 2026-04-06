@@ -420,6 +420,9 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
   const numMainXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
   const numFeeders = Math.max(4, Math.ceil(distAmps / 1200));
   const ampsPerFeeder = distAmps / numFeeders;
+  // Limit displayed elements for visual clarity (show representative sample)
+  const showMainXfmrs = Math.min(numMainXfmrs, 3);
+  const showFeeders = Math.min(numFeeders, 5);
 
   const Bus = ({x, y, width, color, label, thickness=4, amps, rating}) => {
     const ampsColor = amps > rating ? COLORS.danger : amps > rating*0.8 ? COLORS.warning : COLORS.ok;
@@ -683,46 +686,114 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
             );
           })()}
 
-          {/* GAS GENERATION */}
+          {/* GAS GENERATION - with individual generators at appropriate voltage levels */}
           {hasGas && gasEquip && (() => {
             const hCount = gasEquip.hframe || 0;
             const fCount = gasEquip.fframe || 0;
             const aCount = gasEquip.aero || 0;
             const rCount = gasEquip.recip || 0;
+            const hasH = hCount > 0, hasF = fCount > 0, hasA = aCount > 0, hasR = rCount > 0;
             const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
-            const gasX = busStartX + busWidth * 0.6;
 
-            // Calculate gas contribution to 34.5kV
-            const gasToMV = gasMW;
-            const gasAmpsAtMV = calcAmps(gasToMV, 34.5);
+            // Position gas equipment in middle-right of diagram
+            const gasStartX = busStartX + busWidth * 0.5;
+            const gasAmpsAtMV = calcAmps(gasMW, 34.5);
+            const hAmps = hCount > 0 ? calcAmps(hCount * 400, 345) : 0;
+            const fAmps = fCount > 0 ? calcAmps(fCount * 200, 138) : 0;
 
             return (
               <g>
-                {/* Gas generation summary */}
-                <rect x={gasX-80} y={BUS_Y.mv-90} width={160} height={70} rx={4} fill="rgba(194,75,75,0.1)" stroke="#C24B4B44"/>
-                <text x={gasX} y={BUS_Y.mv-76} textAnchor="middle" fill={COLORS.gas} fontSize={9} fontWeight={700} fontFamily={F.m}>GAS GENERATION</text>
-                <text x={gasX} y={BUS_Y.mv-64} textAnchor="middle" fill="#889" fontSize={7} fontFamily={F.m}>{gasMW} MW Total</text>
+                {/* H-Frame generators - 345kV (shown above 230kV bus) */}
+                {hasH && (
+                  <g>
+                    <line x1={gasStartX} y1={BUS_Y.hv-70} x2={gasStartX+Math.min(hCount,3)*80} y2={BUS_Y.hv-70} stroke="#ff6b6b" strokeWidth={4}/>
+                    {showCurrents && <text x={gasStartX+Math.min(hCount,3)*80+8} y={BUS_Y.hv-68} fill="#ff6b6b" fontSize={7} fontFamily={F.m}>345kV {Math.round(hAmps)}A</text>}
+                    {Array.from({length: Math.min(hCount, 3)}).map((_, i) => {
+                      const hx = gasStartX + 30 + i * 80;
+                      return (
+                        <g key={"hframe-"+i}>
+                          <Generator x={hx} y={BUS_Y.hv-120} label={"H-"+(i+1)} mw={400} type="gas" id={"gen-h"+i} voltage={18}/>
+                          <Wire x1={hx} y1={BUS_Y.hv-100} x2={hx} y2={BUS_Y.hv-85}/>
+                          <Transformer x={hx} y={BUS_Y.hv-78} label="GSU" voltages="18-345kV" id={"xfmr-h"+i} r={7}/>
+                          <Wire x1={hx} y1={BUS_Y.hv-70} x2={hx} y2={BUS_Y.hv-70}/>
+                        </g>
+                      );
+                    })}
+                    {hCount > 3 && <text x={gasStartX+Math.min(hCount,3)*80-20} y={BUS_Y.hv-130} fill="#667" fontSize={7} fontFamily={F.m}>(+{hCount-3} more H-Frames)</text>}
+                    <Wire x1={gasStartX+60} y1={BUS_Y.hv-70} x2={gasStartX+60} y2={BUS_Y.hv-15} color="#ff6b6b"/>
+                    <Transformer x={gasStartX+60} y={BUS_Y.hv-8} label="AUTO" voltages="345-230kV" id="xfmr-345-230" r={7}/>
+                    <Wire x1={gasStartX+60} y1={BUS_Y.hv} x2={gasStartX+60} y2={BUS_Y.hv}/>
+                  </g>
+                )}
 
-                {hCount > 0 && <text x={gasX} y={BUS_Y.mv-52} textAnchor="middle" fill={equipColors.hframe} fontSize={7} fontFamily={F.m}>{hCount}× H-Frame (400MW @ 18kV → 345kV)</text>}
-                {fCount > 0 && <text x={gasX} y={BUS_Y.mv-42} textAnchor="middle" fill={equipColors.fframe} fontSize={7} fontFamily={F.m}>{fCount}× F-Frame (200MW @ 13.8kV → 138kV)</text>}
-                {aCount > 0 && <text x={gasX} y={BUS_Y.mv-32} textAnchor="middle" fill={equipColors.aero} fontSize={7} fontFamily={F.m}>{aCount}× Aero (50MW @ 13.8kV)</text>}
-                {rCount > 0 && <text x={gasX} y={BUS_Y.mv-22} textAnchor="middle" fill={equipColors.recip} fontSize={7} fontFamily={F.m}>{rCount}× Recip (20MW @ 480V-4.16kV)</text>}
+                {/* F-Frame generators - 138kV (shown between HV and MV) */}
+                {hasF && (
+                  <g>
+                    <line x1={busStartX+80} y1={BUS_Y.hv+50} x2={busStartX+80+Math.min(fCount,4)*70} y2={BUS_Y.hv+50} stroke="#f0c040" strokeWidth={4}/>
+                    {showCurrents && <text x={busStartX+80+Math.min(fCount,4)*70+8} y={BUS_Y.hv+52} fill="#f0c040" fontSize={7} fontFamily={F.m}>138kV {Math.round(fAmps)}A</text>}
+                    {Array.from({length: Math.min(fCount, 4)}).map((_, i) => {
+                      const fx = busStartX + 110 + i * 70;
+                      return (
+                        <g key={"fframe-"+i}>
+                          <Generator x={fx} y={BUS_Y.hv+10} label={"F-"+(i+1)} mw={200} type="gas" id={"gen-f"+i} voltage={13.8}/>
+                          <Wire x1={fx} y1={BUS_Y.hv+28} x2={fx} y2={BUS_Y.hv+38}/>
+                          <Transformer x={fx} y={BUS_Y.hv+44} label="" voltages="13.8-138kV" id={"xfmr-f"+i} r={5}/>
+                          <Wire x1={fx} y1={BUS_Y.hv+50} x2={fx} y2={BUS_Y.hv+50}/>
+                        </g>
+                      );
+                    })}
+                    {fCount > 4 && <text x={busStartX+80+Math.min(fCount,4)*70-30} y={BUS_Y.hv} fill="#667" fontSize={7} fontFamily={F.m}>(+{fCount-4} more F-Frames)</text>}
+                    <Wire x1={busStartX+180} y1={BUS_Y.hv+50} x2={busStartX+180} y2={BUS_Y.mv-15} color="#f0c040"/>
+                    <Transformer x={busStartX+180} y={BUS_Y.mv-8} label="TIE" voltages="138-34.5kV" id="xfmr-138-34" r={7}/>
+                    <Wire x1={busStartX+180} y1={BUS_Y.mv} x2={busStartX+180} y2={BUS_Y.mv}/>
+                  </g>
+                )}
 
-                <Wire x1={gasX} y1={BUS_Y.mv-20} x2={gasX} y2={BUS_Y.mv-2} color={COLORS.gas}/>
-                <Breaker x={gasX} y={BUS_Y.mv-2} id="cb-gas" label="GAS MAIN" amps={gasAmpsAtMV}/>
+                {/* Aero generators - connect directly to 34.5kV */}
+                {hasA && (
+                  <g>
+                    {Array.from({length: Math.min(aCount, 5)}).map((_, i) => {
+                      const ax = busStartX + busWidth*0.65 + i * 50;
+                      return (
+                        <g key={"aero-"+i}>
+                          <Generator x={ax} y={BUS_Y.mv-50} label={"A-"+(i+1)} mw={50} type="gas" id={"gen-a"+i} voltage={13.8}/>
+                          <Wire x1={ax} y1={BUS_Y.mv-32} x2={ax} y2={BUS_Y.mv-15}/>
+                          <Transformer x={ax} y={BUS_Y.mv-8} label="" voltages="13.8-34.5kV" id={"xfmr-a"+i} r={5}/>
+                          <Wire x1={ax} y1={BUS_Y.mv} x2={ax} y2={BUS_Y.mv}/>
+                        </g>
+                      );
+                    })}
+                    {aCount > 5 && <text x={busStartX+busWidth*0.65+Math.min(aCount,5)*50} y={BUS_Y.mv-55} fill={equipColors.aero} fontSize={7} fontFamily={F.m}>+{aCount-5} Aeros</text>}
+                  </g>
+                )}
+
+                {/* Recip generators - show summary (too many to draw individually) */}
+                {hasR && (
+                  <g>
+                    <rect x={busStartX+busWidth*0.4} y={BUS_Y.mv-75} width={100} height={55} rx={4} fill="rgba(34,197,94,0.1)" stroke={equipColors.recip+"44"}/>
+                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-60} textAnchor="middle" fill={equipColors.recip} fontSize={8} fontWeight={600} fontFamily={F.m}>{rCount}× RECIP</text>
+                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-48} textAnchor="middle" fill="#889" fontSize={7} fontFamily={F.m}>{rCount*20}MW @ 480V</text>
+                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-36} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>5 min start</text>
+                    <Wire x1={busStartX+busWidth*0.4+50} y1={BUS_Y.mv-20} x2={busStartX+busWidth*0.4+50} y2={BUS_Y.mv}/>
+                    <Breaker x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-10} id="cb-recip" label="RECIP"/>
+                  </g>
+                )}
+
+                {/* Gas summary in corner */}
+                {showCurrents && <text x={W-20} y={BUS_Y.mv+15} textAnchor="end" fill={COLORS.gas} fontSize={8} fontFamily={F.m}>Gas Total: {gasMW}MW → {Math.round(gasAmpsAtMV)}A @ 34.5kV</text>}
               </g>
             );
           })()}
 
           {/* ====== DISTRIBUTION TIER ====== */}
-          <text x={busStartX} y={BUS_Y.dist-22} fill="#556" fontSize={8} fontFamily={F.m}>DISTRIBUTION — {numMainXfmrs} MAIN TRANSFORMERS</text>
+          <text x={busStartX} y={BUS_Y.dist-22} fill="#556" fontSize={8} fontFamily={F.m}>DISTRIBUTION — {showMainXfmrs} of {numMainXfmrs} MAIN TRANSFORMERS shown</text>
 
           {/* 12.47kV DISTRIBUTION BUS */}
           <Bus x={busStartX+100} y={BUS_Y.dist} width={busWidth-200} color={COLORS.bus12} label="12.47kV" thickness={4} amps={distAmps} rating={RATINGS["12.47kV"]}/>
 
           {/* Multiple Main Transformers from 34.5kV to 12.47kV */}
-          {Array.from({length: numMainXfmrs}).map((_, i) => {
-            const xfmrX = busStartX + 150 + i * ((busWidth-300) / (numMainXfmrs-1 || 1));
+          {Array.from({length: showMainXfmrs}).map((_, i) => {
+            const xfmrX = busStartX + 150 + i * ((busWidth-300) / (showMainXfmrs-1 || 1));
             const xfmrMVA = Math.round(L / numMainXfmrs * 1.25);
             const xfmrAmps = distAmps / numMainXfmrs;
             return (
@@ -743,8 +814,8 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
           <Bus x={busStartX+150} y={BUS_Y.dc} width={busWidth-300} color={"#ff9f43"} label="480V" thickness={3}/>
 
           {/* Feeders from 12.47kV to 480V */}
-          {Array.from({length: Math.min(numFeeders, 8)}).map((_, i) => {
-            const feederX = busStartX + 180 + i * ((busWidth-360) / (Math.min(numFeeders, 8)-1 || 1));
+          {Array.from({length: showFeeders}).map((_, i) => {
+            const feederX = busStartX + 180 + i * ((busWidth-360) / (showFeeders-1 || 1));
             return (
               <g key={"feeder-"+i}>
                 <Wire x1={feederX} y1={BUS_Y.dist} x2={feederX} y2={BUS_Y.dist+14} color={COLORS.bus12}/>
@@ -754,9 +825,9 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
               </g>
             );
           })}
-          {numFeeders > 8 && (
+          {numFeeders > showFeeders && (
             <text x={W/2} y={(BUS_Y.dist+BUS_Y.dc)/2+24} textAnchor="middle" fill="#667" fontSize={8} fontFamily={F.m}>
-              (+{numFeeders-8} more feeders not shown)
+              (showing {showFeeders} of {numFeeders} feeders needed)
             </text>
           )}
 
