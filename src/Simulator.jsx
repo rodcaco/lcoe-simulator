@@ -389,239 +389,290 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
   const [showCurrents, setShowCurrents] = useState(true);
 
   const L = p.loadMW;
-  const W = 1000, H = 700;
+  const W = 1100, H = 900;
 
   const hasSolar = sz.solarMW > 0, hasWind = sz.windMW > 0, hasGas = sz.gasMW > 0, hasBatt = (sz.battMW||0) > 0;
   const solarMW = sz.solarMW || 0, windMW = sz.windMW || 0, gasMW = sz.gasMW || 0, battMW = sz.battMW || 0, battMWh = sz.battMWh || 0;
   const totalGenMW = solarMW + windMW + gasMW;
 
   const COLORS = {
-    bus345: "#ff6b6b", bus230: "#f0c040", bus138: "#f97316", bus34: "#06b6d4",
-    bus13: "#a78bfa", bus12: "#14ffb4", bus480: "#ff9f43",
-    solar: "#D4A026", wind: "#3D7EC7", gas: "#C24B4B", battery: "#2D8C6F",
-    wire: "#556677", text: "#8899aa",
+    bus345: "#ef4444", bus230: "#f59e0b", bus138: "#f97316", bus34: "#06b6d4",
+    bus13: "#a78bfa", bus12: "#10b981", bus480: "#ff9f43",
+    solar: "#eab308", wind: "#3b82f6", gas: "#ef4444", battery: "#10b981",
+    wire: "#4b5563", text: "#9ca3af",
   };
 
-  // Simplified vertical layout - more space between levels
-  const Y = { gen: 60, hv: 160, mv: 300, dist: 440, dc: 580 };
-  const margin = 40;
-
-  // Current calculations
-  const mvAmps = calcAmps(L, 34.5);
-  const distAmps = calcAmps(L, 12.47);
-  const numXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
-
-  // Simple components
-  const Bus = ({x, y, w, color, label}) => (
-    <g>
-      <line x1={x} y1={y} x2={x+w} y2={y} stroke={color} strokeWidth={4} strokeLinecap="round"/>
-      <text x={x-5} y={y+4} fill={color} fontSize={9} fontFamily={F.m} fontWeight={600} textAnchor="end">{label}</text>
-    </g>
-  );
-
-  const Gen = ({x, y, label, mw, color, sub}) => {
-    const isHovered = hoveredNode === label;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(label)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y} r={16} fill={isHovered?color+"33":"#1a1d25"} stroke={color} strokeWidth={2}/>
-        <text x={x} y={y+4} textAnchor="middle" fill={color} fontSize={9} fontWeight={700} fontFamily={F.m}>G</text>
-        <text x={x} y={y+28} textAnchor="middle" fill={color} fontSize={8} fontFamily={F.m}>{label}</text>
-        <text x={x} y={y+38} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>{mw}MW</text>
-        {sub && <text x={x} y={y+48} textAnchor="middle" fill="#556" fontSize={6} fontFamily={F.m}>{sub}</text>}
-      </g>
-    );
+  // Voltage bus Y positions - plenty of vertical space
+  const Y = {
+    bus345: 80,    // H-frames connect here
+    bus230: 180,   // Main HV bus
+    bus138: 280,   // F-frames connect here
+    bus34: 400,    // Collection bus - Aeros connect here
+    bus12: 540,    // Distribution to DC
+    dc: 700,       // Data center
   };
 
-  const Xfmr = ({x, y, label}) => (
-    <g>
-      <circle cx={x} cy={y-4} r={6} fill="none" stroke="#f0c040" strokeWidth={1.5}/>
-      <circle cx={x} cy={y+4} r={6} fill="none" stroke="#f0c040" strokeWidth={1.5}/>
-      {label && <text x={x+10} y={y+3} fill="#889" fontSize={7} fontFamily={F.m}>{label}</text>}
-    </g>
-  );
-
-  const Wire = ({x1, y1, x2, y2, color="#556677"}) => (
-    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1.5}/>
-  );
-
-  const Box = ({x, y, w, h, label, sub, color}) => (
-    <g>
-      <rect x={x-w/2} y={y-h/2} width={w} height={h} rx={4} fill={color+"15"} stroke={color+"66"} strokeWidth={1.5}/>
-      <text x={x} y={y-2} textAnchor="middle" fill={color} fontSize={9} fontWeight={600} fontFamily={F.m}>{label}</text>
-      {sub && <text x={x} y={y+10} textAnchor="middle" fill="#778" fontSize={7} fontFamily={F.m}>{sub}</text>}
-    </g>
-  );
+  const margin = 50;
+  const busWidth = W - margin * 2;
 
   // Gas equipment counts
   const hCount = gasEquip?.hframe || 0;
   const fCount = gasEquip?.fframe || 0;
   const aCount = gasEquip?.aero || 0;
   const rCount = gasEquip?.recip || 0;
+  const hasH = hCount > 0, hasF = fCount > 0, hasA = aCount > 0, hasR = rCount > 0;
+
+  // Current calculations
+  const mvAmps = calcAmps(L, 34.5);
+  const distAmps = calcAmps(L, 12.47);
+  const numXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
+
+  // Simple reusable components
+  const Bus = ({y, color, label, amps}) => (
+    <g>
+      <line x1={margin} y1={y} x2={margin+busWidth} y2={y} stroke={color} strokeWidth={5} strokeLinecap="round"/>
+      <text x={margin-8} y={y+4} fill={color} fontSize={10} fontFamily={F.m} fontWeight={700} textAnchor="end">{label}</text>
+      {showCurrents && amps > 0 && (
+        <text x={margin+busWidth+8} y={y+4} fill={color} fontSize={9} fontFamily={F.m}>{Math.round(amps).toLocaleString()}A</text>
+      )}
+    </g>
+  );
+
+  const Gen = ({x, y, label, mw, color, type}) => {
+    const isHovered = hoveredNode === label;
+    return (
+      <g onMouseEnter={()=>setHoveredNode(label)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
+        <circle cx={x} cy={y} r={18} fill={isHovered ? color+"22" : "#0f1115"} stroke={color} strokeWidth={2}/>
+        <text x={x} y={y+5} textAnchor="middle" fill={color} fontSize={11} fontWeight={700} fontFamily={F.m}>G</text>
+        <text x={x} y={y+32} textAnchor="middle" fill={color} fontSize={9} fontWeight={600} fontFamily={F.m}>{label}</text>
+        <text x={x} y={y+44} textAnchor="middle" fill="#6b7280" fontSize={8} fontFamily={F.m}>{mw}MW</text>
+      </g>
+    );
+  };
+
+  const Xfmr = ({x, y1, y2, label, color1, color2}) => {
+    const midY = (y1 + y2) / 2;
+    return (
+      <g>
+        <line x1={x} y1={y1} x2={x} y2={midY-12} stroke={color1 || "#4b5563"} strokeWidth={2}/>
+        <circle cx={x} cy={midY-6} r={8} fill="none" stroke="#fbbf24" strokeWidth={2}/>
+        <circle cx={x} cy={midY+6} r={8} fill="none" stroke="#fbbf24" strokeWidth={2}/>
+        <line x1={x} y1={midY+12} x2={x} y2={y2} stroke={color2 || "#4b5563"} strokeWidth={2}/>
+        {label && <text x={x+14} y={midY+4} fill="#6b7280" fontSize={8} fontFamily={F.m}>{label}</text>}
+      </g>
+    );
+  };
+
+  const Box = ({x, y, w, h, label, sub, color}) => (
+    <g>
+      <rect x={x-w/2} y={y-h/2} width={w} height={h} rx={4} fill={color+"18"} stroke={color+"55"} strokeWidth={2}/>
+      <text x={x} y={y} textAnchor="middle" fill={color} fontSize={10} fontWeight={600} fontFamily={F.m}>{label}</text>
+      {sub && <text x={x} y={y+14} textAnchor="middle" fill="#6b7280" fontSize={8} fontFamily={F.m}>{sub}</text>}
+    </g>
+  );
 
   return (
     <div style={{padding:12, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8}}>
       {/* Header */}
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
         <div>
-          <div style={{fontSize:12, fontWeight:700, color:"#E8E6E1", fontFamily:F.m}}>Single Line Diagram — {configId.toUpperCase()}</div>
-          <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m}}>{totalGenMW.toLocaleString()} MW generation → {L} MW load</div>
+          <div style={{fontSize:13, fontWeight:700, color:"#E8E6E1", fontFamily:F.m}}>Single Line Diagram — {configId.toUpperCase()}</div>
+          <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m}}>
+            {totalGenMW.toLocaleString()} MW generation → {L} MW load
+            {hasGas && gasMetrics && ` • Gas: HR ${gasMetrics.weightedHeatRate?.toFixed(1)}, Start ${gasMetrics.avgStartup?.toFixed(0)}min`}
+          </div>
         </div>
-        <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
+        <label style={{display:"flex", alignItems:"center", gap:5, fontSize:9, color:"#9ca3af", cursor:"pointer"}}>
           <input type="checkbox" checked={showCurrents} onChange={()=>setShowCurrents(!showCurrents)} style={{accentColor:"#f97316"}}/>
-          Show Amps
+          Show Currents
         </label>
       </div>
 
-      {/* Current Flow Summary */}
-      {showCurrents && (
-        <div style={{background:"#1a1d25", borderRadius:4, padding:8, marginBottom:8, fontSize:9, fontFamily:F.m}}>
-          <span style={{color:"#889"}}>Current Flow: </span>
-          <span style={{color:COLORS.bus34}}>34.5kV: {Math.round(mvAmps).toLocaleString()}A</span>
-          <span style={{color:"#445"}}> → </span>
-          <span style={{color:COLORS.bus12}}>12.47kV: {Math.round(distAmps).toLocaleString()}A</span>
-          <span style={{color:"#445"}}> → </span>
-          <span style={{color:"#889"}}>{numXfmrs} transformers needed</span>
-        </div>
-      )}
-
-      <div style={{overflowX:"auto", background:"#0d0f13", borderRadius:6, padding:8}}>
+      <div style={{overflowX:"auto", background:"#0a0c0f", borderRadius:6, border:"1px solid #1f2937"}}>
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-          {/* Grid */}
+          {/* Background grid */}
           <defs>
             <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1a1d25" strokeWidth="0.5"/>
+              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1f2937" strokeWidth="0.5"/>
             </pattern>
           </defs>
           <rect width={W} height={H} fill="url(#grid)"/>
 
-          {/* ===== GENERATION LEVEL ===== */}
-          <text x={margin} y={Y.gen-15} fill="#445" fontSize={8} fontFamily={F.m}>GENERATION</text>
+          {/* ========== 345kV BUS - H-FRAMES ========== */}
+          {hasH && (
+            <g>
+              <Bus y={Y.bus345} color={COLORS.bus345} label="345kV" amps={calcAmps(hCount*400, 345)}/>
+              <text x={margin+busWidth-5} y={Y.bus345-12} fill="#6b7280" fontSize={8} fontFamily={F.m} textAnchor="end">H-Frame Combined Cycle</text>
 
-          {/* Solar */}
+              {/* H-Frame generators */}
+              {Array.from({length: Math.min(hCount, 3)}).map((_, i) => {
+                const x = margin + 100 + i * 120;
+                return (
+                  <g key={"h-"+i}>
+                    <Gen x={x} y={Y.bus345-70} label={`H-${i+1}`} mw={400} color="#6366f1" type="hframe"/>
+                    <Xfmr x={x} y1={Y.bus345-50} y2={Y.bus345} label="GSU" color1="#6366f1" color2={COLORS.bus345}/>
+                  </g>
+                );
+              })}
+              {hCount > 3 && <text x={margin+100+3*120} y={Y.bus345-60} fill="#6b7280" fontSize={9} fontFamily={F.m}>+{hCount-3} more</text>}
+
+              {/* 345kV to 230kV tie */}
+              <Xfmr x={margin+busWidth-100} y1={Y.bus345} y2={Y.bus230} label="AUTO" color1={COLORS.bus345} color2={COLORS.bus230}/>
+            </g>
+          )}
+
+          {/* ========== 230kV BUS - MAIN HV ========== */}
+          <Bus y={Y.bus230} color={COLORS.bus230} label="230kV" amps={calcAmps(totalGenMW, 230)}/>
+          <text x={margin+busWidth-5} y={Y.bus230-12} fill="#6b7280" fontSize={8} fontFamily={F.m} textAnchor="end">Main HV Bus</text>
+
+          {/* Solar connects to 230kV */}
           {hasSolar && (
             <g>
-              <Gen x={margin+60} y={Y.gen} label="SOLAR" mw={solarMW} color={COLORS.solar} sub={`CF ${(p.solarCF*100).toFixed(0)}%`}/>
-              <Wire x1={margin+60} y1={Y.gen+18} x2={margin+60} y2={Y.hv-20}/>
-              <Xfmr x={margin+60} y={Y.hv-12} label="SSU"/>
-              <Wire x1={margin+60} y1={Y.hv-4} x2={margin+60} y2={Y.hv}/>
+              <Box x={margin+80} y={Y.bus230-70} w={70} h={45} label="SOLAR" sub={`${solarMW}MW`} color={COLORS.solar}/>
+              <Xfmr x={margin+80} y1={Y.bus230-45} y2={Y.bus230} label="SSU" color1={COLORS.solar} color2={COLORS.bus230}/>
             </g>
           )}
 
-          {/* Wind */}
+          {/* Wind connects to 230kV */}
           {hasWind && (
             <g>
-              <Gen x={margin+160} y={Y.gen} label="WIND" mw={windMW} color={COLORS.wind} sub={`CF ${(p.windCF*100).toFixed(0)}%`}/>
-              <Wire x1={margin+160} y1={Y.gen+18} x2={margin+160} y2={Y.hv-20}/>
-              <Xfmr x={margin+160} y={Y.hv-12} label="PAD"/>
-              <Wire x1={margin+160} y1={Y.hv-4} x2={margin+160} y2={Y.hv}/>
+              <Box x={margin+200} y={Y.bus230-70} w={70} h={45} label="WIND" sub={`${windMW}MW`} color={COLORS.wind}/>
+              <Xfmr x={margin+200} y1={Y.bus230-45} y2={Y.bus230} label="PAD" color1={COLORS.wind} color2={COLORS.bus230}/>
             </g>
           )}
 
-          {/* Battery */}
+          {/* Battery connects to 230kV */}
           {hasBatt && (
             <g>
-              <Box x={margin+260} y={Y.gen} w={50} h={30} label="BESS" sub={`${battMW}MW`} color={COLORS.battery}/>
-              <Wire x1={margin+260} y1={Y.gen+18} x2={margin+260} y2={Y.hv-20}/>
-              <Xfmr x={margin+260} y={Y.hv-12} label="PCS"/>
-              <Wire x1={margin+260} y1={Y.hv-4} x2={margin+260} y2={Y.hv}/>
+              <Box x={margin+320} y={Y.bus230-70} w={70} h={45} label="BESS" sub={`${battMW}MW/${(battMWh/1000).toFixed(1)}GWh`} color={COLORS.battery}/>
+              <Xfmr x={margin+320} y1={Y.bus230-45} y2={Y.bus230} label="PCS" color1={COLORS.battery} color2={COLORS.bus230}/>
             </g>
           )}
 
-          {/* Gas Generation - Right Side */}
-          {hasGas && (
+          {/* 230kV to 138kV/34.5kV tie (if no F-frames, skip 138kV) */}
+          {!hasF && (
+            <Xfmr x={W/2} y1={Y.bus230} y2={Y.bus34} label="MAIN TIE" color1={COLORS.bus230} color2={COLORS.bus34}/>
+          )}
+          {hasF && (
+            <Xfmr x={W/2+150} y1={Y.bus230} y2={Y.bus138} label="TIE" color1={COLORS.bus230} color2={COLORS.bus138}/>
+          )}
+
+          {/* ========== 138kV BUS - F-FRAMES ========== */}
+          {hasF && (
             <g>
-              {/* Gas summary box */}
-              <rect x={W-margin-220} y={Y.gen-25} width={200} height={75} rx={4} fill="rgba(194,75,75,0.08)" stroke="#C24B4B33"/>
-              <text x={W-margin-120} y={Y.gen-8} textAnchor="middle" fill={COLORS.gas} fontSize={10} fontWeight={700} fontFamily={F.m}>GAS GENERATION</text>
-              <text x={W-margin-120} y={Y.gen+8} textAnchor="middle" fill="#889" fontSize={8} fontFamily={F.m}>{gasMW} MW Total</text>
+              <Bus y={Y.bus138} color={COLORS.bus138} label="138kV" amps={calcAmps(fCount*200, 138)}/>
+              <text x={margin+busWidth-5} y={Y.bus138-12} fill="#6b7280" fontSize={8} fontFamily={F.m} textAnchor="end">F-Frame Combined Cycle</text>
 
-              {/* Equipment breakdown */}
-              <text x={W-margin-200} y={Y.gen+25} fill="#6366f1" fontSize={8} fontFamily={F.m}>
-                {hCount > 0 ? `${hCount}× H-Frame` : ""}
-              </text>
-              <text x={W-margin-120} y={Y.gen+25} fill="#f97316" fontSize={8} fontFamily={F.m}>
-                {fCount > 0 ? `${fCount}× F-Frame` : ""}
-              </text>
-              <text x={W-margin-200} y={Y.gen+38} fill="#06b6d4" fontSize={8} fontFamily={F.m}>
-                {aCount > 0 ? `${aCount}× Aero` : ""}
-              </text>
-              <text x={W-margin-120} y={Y.gen+38} fill="#22c55e" fontSize={8} fontFamily={F.m}>
-                {rCount > 0 ? `${rCount}× Recip` : ""}
-              </text>
+              {/* F-Frame generators */}
+              {Array.from({length: Math.min(fCount, 5)}).map((_, i) => {
+                const x = margin + 80 + i * 100;
+                return (
+                  <g key={"f-"+i}>
+                    <Gen x={x} y={Y.bus138-70} label={`F-${i+1}`} mw={200} color="#f97316" type="fframe"/>
+                    <Xfmr x={x} y1={Y.bus138-50} y2={Y.bus138} label="" color1="#f97316" color2={COLORS.bus138}/>
+                  </g>
+                );
+              })}
+              {fCount > 5 && <text x={margin+80+5*100} y={Y.bus138-60} fill="#6b7280" fontSize={9} fontFamily={F.m}>+{fCount-5} more</text>}
 
-              {/* Connection to HV bus */}
-              <Wire x1={W-margin-120} y1={Y.gen+50} x2={W-margin-120} y2={Y.hv-20} color={COLORS.gas}/>
-              <Xfmr x={W-margin-120} y={Y.hv-12} label="GSU"/>
-              <Wire x1={W-margin-120} y1={Y.hv-4} x2={W-margin-120} y2={Y.hv}/>
+              {/* 138kV to 34.5kV tie */}
+              <Xfmr x={margin+busWidth-100} y1={Y.bus138} y2={Y.bus34} label="TIE" color1={COLORS.bus138} color2={COLORS.bus34}/>
             </g>
           )}
 
-          {/* ===== 230kV BUS ===== */}
-          <Bus x={margin} y={Y.hv} w={W-margin*2} color={COLORS.bus230} label="230kV"/>
-          {showCurrents && <text x={W-margin+5} y={Y.hv+4} fill={COLORS.bus230} fontSize={8} fontFamily={F.m}>{Math.round(calcAmps(totalGenMW, 230))}A</text>}
+          {/* ========== 34.5kV BUS - COLLECTION ========== */}
+          <Bus y={Y.bus34} color={COLORS.bus34} label="34.5kV" amps={mvAmps}/>
+          <text x={margin+busWidth-5} y={Y.bus34-12} fill="#6b7280" fontSize={8} fontFamily={F.m} textAnchor="end">Collection Bus</text>
 
-          {/* Tie transformer 230kV to 34.5kV */}
-          <Wire x1={W/2} y1={Y.hv} x2={W/2} y2={Y.mv-20} color={COLORS.bus230}/>
-          <Xfmr x={W/2} y={(Y.hv+Y.mv)/2} label="MAIN TIE"/>
+          {/* Aero generators connect to 34.5kV */}
+          {hasA && (
+            <g>
+              {Array.from({length: Math.min(aCount, 6)}).map((_, i) => {
+                const x = margin + 80 + i * 80;
+                return (
+                  <g key={"a-"+i}>
+                    <Gen x={x} y={Y.bus34-65} label={`A-${i+1}`} mw={50} color="#06b6d4" type="aero"/>
+                    <Xfmr x={x} y1={Y.bus34-45} y2={Y.bus34} label="" color1="#06b6d4" color2={COLORS.bus34}/>
+                  </g>
+                );
+              })}
+              {aCount > 6 && <text x={margin+80+6*80} y={Y.bus34-55} fill="#06b6d4" fontSize={9} fontFamily={F.m}>+{aCount-6} Aeros</text>}
+            </g>
+          )}
 
-          {/* ===== 34.5kV BUS ===== */}
-          <Bus x={margin} y={Y.mv} w={W-margin*2} color={COLORS.bus34} label="34.5kV"/>
-          {showCurrents && <text x={W-margin+5} y={Y.mv+4} fill={COLORS.bus34} fontSize={8} fontFamily={F.m}>{Math.round(mvAmps)}A</text>}
+          {/* Recip generators - shown as summary box connecting to 34.5kV */}
+          {hasR && (
+            <g>
+              <rect x={margin+busWidth-180} y={Y.bus34-80} width={120} height={55} rx={4} fill="#22c55e15" stroke="#22c55e44"/>
+              <text x={margin+busWidth-120} y={Y.bus34-58} textAnchor="middle" fill="#22c55e" fontSize={10} fontWeight={600} fontFamily={F.m}>{rCount}× RECIP</text>
+              <text x={margin+busWidth-120} y={Y.bus34-42} textAnchor="middle" fill="#6b7280" fontSize={8} fontFamily={F.m}>{rCount*20}MW total</text>
+              <text x={margin+busWidth-120} y={Y.bus34-28} textAnchor="middle" fill="#4b5563" fontSize={7} fontFamily={F.m}>5 min fast start</text>
+              <line x1={margin+busWidth-120} y1={Y.bus34-25} x2={margin+busWidth-120} y2={Y.bus34} stroke="#22c55e" strokeWidth={2}/>
+            </g>
+          )}
 
-          {/* Multiple distribution transformers */}
-          {[0,1,2].map(i => {
-            const x = margin + 150 + i * 250;
+          {/* ========== 12.47kV BUS - DISTRIBUTION ========== */}
+          <Bus y={Y.bus12} color={COLORS.bus12} label="12.47kV" amps={distAmps}/>
+          <text x={margin+busWidth-5} y={Y.bus12-12} fill="#6b7280" fontSize={8} fontFamily={F.m} textAnchor="end">Distribution ({numXfmrs} transformers needed)</text>
+
+          {/* Main transformers 34.5kV to 12.47kV */}
+          {[0, 1, 2].map(i => {
+            const x = margin + 200 + i * 200;
             return (
-              <g key={"dist-"+i}>
-                <Wire x1={x} y1={Y.mv} x2={x} y2={Y.dist-20} color={COLORS.bus34}/>
-                <Xfmr x={x} y={(Y.mv+Y.dist)/2} label={`XFMR ${i+1}`}/>
-                <Wire x1={x} y1={(Y.mv+Y.dist)/2+12} x2={x} y2={Y.dist}/>
+              <g key={"main-"+i}>
+                <Xfmr x={x} y1={Y.bus34} y2={Y.bus12} label={i===1 ? `MAIN ${i+1}` : ""} color1={COLORS.bus34} color2={COLORS.bus12}/>
               </g>
             );
           })}
-          {numXfmrs > 3 && <text x={W/2} y={(Y.mv+Y.dist)/2+30} textAnchor="middle" fill="#556" fontSize={8} fontFamily={F.m}>(showing 3 of {numXfmrs} transformers)</text>}
+          {numXfmrs > 3 && (
+            <text x={W/2} y={(Y.bus34+Y.bus12)/2+25} textAnchor="middle" fill="#4b5563" fontSize={8} fontFamily={F.m}>(showing 3 of {numXfmrs})</text>
+          )}
 
-          {/* ===== 12.47kV BUS ===== */}
-          <Bus x={margin+100} y={Y.dist} w={W-margin*2-200} color={COLORS.bus12} label="12.47kV"/>
-          {showCurrents && <text x={W-margin-100+5} y={Y.dist+4} fill={COLORS.bus12} fontSize={8} fontFamily={F.m}>{Math.round(distAmps)}A</text>}
-
-          {/* Feeders to data center */}
-          {[0,1,2,3,4].map(i => {
-            const x = margin + 150 + i * 150;
+          {/* ========== DATA CENTER ========== */}
+          {/* Feeders to 480V */}
+          {[0, 1, 2, 3].map(i => {
+            const x = margin + 200 + i * 150;
             return (
-              <g key={"feed-"+i}>
-                <Wire x1={x} y1={Y.dist} x2={x} y2={Y.dc-15} color={COLORS.bus12}/>
-                <rect x={x-15} y={Y.dc-12} width={30} height={16} rx={2} fill="#1a1d25" stroke="#ff9f4366"/>
-                <text x={x} y={Y.dc-1} textAnchor="middle" fill="#ff9f43" fontSize={7} fontFamily={F.m}>480V</text>
+              <g key={"dc-"+i}>
+                <line x1={x} y1={Y.bus12} x2={x} y2={Y.dc-50} stroke={COLORS.bus12} strokeWidth={2}/>
+                <rect x={x-18} y={Y.dc-48} width={36} height={18} rx={3} fill="#ff9f4322" stroke="#ff9f4355"/>
+                <text x={x} y={Y.dc-35} textAnchor="middle" fill="#ff9f43" fontSize={8} fontFamily={F.m}>480V</text>
+                <line x1={x} y1={Y.dc-30} x2={x} y2={Y.dc-15} stroke="#ff9f43" strokeWidth={2} strokeDasharray="4,2"/>
               </g>
             );
           })}
 
-          {/* ===== DATA CENTER ===== */}
-          <rect x={W/2-80} y={Y.dc+10} width={160} height={50} rx={6} fill="rgba(249,115,22,0.1)" stroke="#f9731666" strokeWidth={2}/>
-          <text x={W/2} y={Y.dc+35} textAnchor="middle" fill="#f97316" fontSize={12} fontWeight={700} fontFamily={F.m}>DATA CENTER</text>
-          <text x={W/2} y={Y.dc+50} textAnchor="middle" fill="#f97316aa" fontSize={9} fontFamily={F.m}>{L} MW Load</text>
+          {/* Data Center Load */}
+          <rect x={W/2-100} y={Y.dc-10} width={200} height={70} rx={6} fill="#f9731615" stroke="#f9731655" strokeWidth={2}/>
+          <text x={W/2} y={Y.dc+20} textAnchor="middle" fill="#f97316" fontSize={14} fontWeight={700} fontFamily={F.m}>DATA CENTER</text>
+          <text x={W/2} y={Y.dc+40} textAnchor="middle" fill="#f97316aa" fontSize={10} fontFamily={F.m}>{L} MW Load</text>
 
-          {/* Voltage level labels on right */}
-          <text x={W-15} y={Y.hv+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Transmission</text>
-          <text x={W-15} y={Y.mv+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Collection</text>
-          <text x={W-15} y={Y.dist+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Distribution</text>
+          {/* Voltage level annotations */}
+          <text x={W-20} y={Y.bus345+5} fill="#374151" fontSize={7} fontFamily={F.m} textAnchor="end">EHV Generation</text>
+          <text x={W-20} y={Y.bus230+5} fill="#374151" fontSize={7} fontFamily={F.m} textAnchor="end">HV Transmission</text>
+          {hasF && <text x={W-20} y={Y.bus138+5} fill="#374151" fontSize={7} fontFamily={F.m} textAnchor="end">HV Generation</text>}
+          <text x={W-20} y={Y.bus34+5} fill="#374151" fontSize={7} fontFamily={F.m} textAnchor="end">MV Collection</text>
+          <text x={W-20} y={Y.bus12+5} fill="#374151" fontSize={7} fontFamily={F.m} textAnchor="end">MV Distribution</text>
 
+          {/* Empty state */}
           {!hasSolar && !hasWind && !hasGas && !hasBatt && (
-            <text x={W/2} y={H/2} textAnchor="middle" fill="#445" fontSize={11} fontFamily={F.m}>
+            <text x={W/2} y={H/2} textAnchor="middle" fill="#374151" fontSize={12} fontFamily={F.m}>
               Configure generation sources to see diagram
             </text>
           )}
         </svg>
       </div>
 
-      {/* Compact Legend */}
-      <div style={{display:"flex", gap:16, marginTop:8, fontSize:8, color:"#667", fontFamily:F.m}}>
-        <span><span style={{color:COLORS.solar}}>●</span> Solar</span>
-        <span><span style={{color:COLORS.wind}}>●</span> Wind</span>
-        <span><span style={{color:COLORS.battery}}>●</span> Battery</span>
-        <span><span style={{color:COLORS.gas}}>●</span> Gas</span>
-        <span style={{marginLeft:"auto"}}>Amps = MW × 1000 / (√3 × kV × 0.9)</span>
+      {/* Legend */}
+      <div style={{display:"flex", flexWrap:"wrap", gap:12, marginTop:10, fontSize:9, color:"#9ca3af", fontFamily:F.m}}>
+        {hasH && <span><span style={{color:"#6366f1"}}>●</span> H-Frame 400MW @ 345kV</span>}
+        {hasF && <span><span style={{color:"#f97316"}}>●</span> F-Frame 200MW @ 138kV</span>}
+        {hasA && <span><span style={{color:"#06b6d4"}}>●</span> Aero 50MW @ 34.5kV</span>}
+        {hasR && <span><span style={{color:"#22c55e"}}>●</span> Recip 20MW</span>}
+        {hasSolar && <span><span style={{color:COLORS.solar}}>●</span> Solar</span>}
+        {hasWind && <span><span style={{color:COLORS.wind}}>●</span> Wind</span>}
+        {hasBatt && <span><span style={{color:COLORS.battery}}>●</span> Battery</span>}
+        <span style={{marginLeft:"auto", color:"#6b7280"}}>Amps = MW × 1000 / (√3 × kV × 0.9)</span>
       </div>
     </div>
   );
