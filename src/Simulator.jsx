@@ -379,530 +379,249 @@ function GasPresetPanel({gasPreset, setGasPreset, gasConfig, gasMetrics}) {
 }
 
 // ============ ENHANCED SLD COMPONENT ============
-// Current formula: Amps = MW × 1000 / (√3 × kV × PF)   (PF ≈ 0.9)
+// Current formula: Amps = MW × 1000 / (√3 × kV × PF)
 function calcAmps(mw, kv, pf=0.9) {
   return mw * 1000 / (Math.sqrt(3) * kv * pf);
 }
 
 function SLD({configId, sz, p, gasEquip, gasMetrics}) {
   const [hoveredNode, setHoveredNode] = useState(null);
-  const [showVoltages, setShowVoltages] = useState(true);
   const [showCurrents, setShowCurrents] = useState(true);
 
   const L = p.loadMW;
-  const W = 1200, H = 950;
+  const W = 1000, H = 700;
 
   const hasSolar = sz.solarMW > 0, hasWind = sz.windMW > 0, hasGas = sz.gasMW > 0, hasBatt = (sz.battMW||0) > 0;
   const solarMW = sz.solarMW || 0, windMW = sz.windMW || 0, gasMW = sz.gasMW || 0, battMW = sz.battMW || 0, battMWh = sz.battMWh || 0;
   const totalGenMW = solarMW + windMW + gasMW;
 
-  // Color scheme by voltage level
   const COLORS = {
-    bus500: "#ff6b6b", bus345: "#ff6b6b", bus230: "#f0c040", bus138: "#f97316", bus34: "#06b6d4",
-    bus13: "#a78bfa", bus12: "#14ffb4", bus480: "#ff9f43", busDC: "#54a0ff",
+    bus345: "#ff6b6b", bus230: "#f0c040", bus138: "#f97316", bus34: "#06b6d4",
+    bus13: "#a78bfa", bus12: "#14ffb4", bus480: "#ff9f43",
     solar: "#D4A026", wind: "#3D7EC7", gas: "#C24B4B", battery: "#2D8C6F",
-    wire: "#556677", text: "#8899aa", textBright: "#E8E6E1",
-    warning: "#f97316", danger: "#ef4444", ok: "#22c55e",
+    wire: "#556677", text: "#8899aa",
   };
 
-  // Standard switchgear ratings (Amps)
-  const RATINGS = { "345kV": 3000, "230kV": 3000, "138kV": 3000, "34.5kV": 2000, "13.8kV": 3000, "12.47kV": 2000, "480V": 4000 };
+  // Simplified vertical layout - more space between levels
+  const Y = { gen: 60, hv: 160, mv: 300, dist: 440, dc: 580 };
+  const margin = 40;
 
-  const BUS_Y = { hv: 80, mv: 220, dist: 380, dc: 560, load: 720 };
-  const busMargin = 50, busWidth = W - busMargin * 2, busStartX = busMargin;
-
-  // Calculate currents at each level
-  const hvAmps = calcAmps(totalGenMW, 230);
+  // Current calculations
   const mvAmps = calcAmps(L, 34.5);
   const distAmps = calcAmps(L, 12.47);
+  const numXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
 
-  // Number of feeders needed at each level (target ~1500A max per feeder for safety margin)
-  const numMainXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
-  const numFeeders = Math.max(4, Math.ceil(distAmps / 1200));
-  const ampsPerFeeder = distAmps / numFeeders;
-  // Limit displayed elements for visual clarity (show representative sample)
-  const showMainXfmrs = Math.min(numMainXfmrs, 3);
-  const showFeeders = Math.min(numFeeders, 5);
-
-  const Bus = ({x, y, width, color, label, thickness=4, amps, rating}) => {
-    const ampsColor = amps > rating ? COLORS.danger : amps > rating*0.8 ? COLORS.warning : COLORS.ok;
-    return (
-      <g>
-        <line x1={x} y1={y} x2={x+width} y2={y} stroke={color} strokeWidth={thickness} strokeLinecap="round"/>
-        {showVoltages && label && <text x={x-4} y={y+4} fill={color} fontSize={9} fontFamily={F.m} fontWeight={600} textAnchor="end">{label}</text>}
-        {showCurrents && amps && (
-          <g>
-            <text x={x+width+8} y={y-2} fill={ampsColor} fontSize={8} fontFamily={F.m} fontWeight={600}>{Math.round(amps).toLocaleString()}A</text>
-            <text x={x+width+8} y={y+9} fill="#556" fontSize={7} fontFamily={F.m}>(max {rating}A)</text>
-          </g>
-        )}
-      </g>
-    );
-  };
-
-  const Breaker = ({x, y, size=8, id, label, amps}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-size/2} y={y-size/2} width={size} height={size} fill={isHovered?"#ff8080":"#1E2330"} stroke={isHovered?"#ff6b6b":"#E8E6E1"} strokeWidth={1.5} rx={2}/>
-        {isHovered && label && <text x={x+size/2+4} y={y+3} fill="#ff8080" fontSize={7} fontFamily={F.m}>{label}</text>}
-        {isHovered && amps && <text x={x+size/2+4} y={y+12} fill="#889" fontSize={6} fontFamily={F.m}>{Math.round(amps)}A</text>}
-      </g>
-    );
-  };
-
-  const Transformer = ({x, y, label, voltages, id, r=12, mva}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y-5} r={r} fill="none" stroke={isHovered?"#ffd060":"#f0c040"} strokeWidth={1.5}/>
-        <circle cx={x} cy={y+5} r={r} fill="none" stroke={isHovered?"#ffd060":"#f0c040"} strokeWidth={1.5}/>
-        {label && <text x={x+r+6} y={y+3} fill={isHovered?"#ffd060":COLORS.text} fontSize={8} fontFamily={F.m}>{label}</text>}
-        {isHovered && voltages && <text x={x+r+6} y={y+13} fill="#667" fontSize={7} fontFamily={F.m}>{voltages}</text>}
-        {isHovered && mva && <text x={x+r+6} y={y+22} fill="#667" fontSize={7} fontFamily={F.m}>{mva} MVA</text>}
-      </g>
-    );
-  };
-
-  const Generator = ({x, y, label, mw, type, id, voltage}) => {
-    const isHovered = hoveredNode === id;
-    const col = type==="solar"?COLORS.solar:type==="wind"?COLORS.wind:type==="gas"?COLORS.gas:COLORS.battery;
-    const r = 18;
-    const genAmps = voltage ? calcAmps(mw, voltage) : 0;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y} r={r} fill={isHovered?col+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?col:col+"88"} strokeWidth={2}/>
-        <text x={x} y={y-2} textAnchor="middle" fill={col} fontSize={10} fontWeight={700} fontFamily={F.m}>G</text>
-        <text x={x} y={y+8} textAnchor="middle" fill={col+"aa"} fontSize={7} fontFamily={F.m}>{mw}MW</text>
-        <text x={x} y={y+r+10} textAnchor="middle" fill={isHovered?col:COLORS.text} fontSize={7} fontWeight={600} fontFamily={F.m}>{label}</text>
-        {isHovered && voltage && (
-          <g><rect x={x-40} y={y+r+14} width={80} height={22} rx={3} fill="rgba(0,0,0,0.9)" stroke={col+"44"}/>
-          <text x={x} y={y+r+25} textAnchor="middle" fill={col} fontSize={7} fontFamily={F.m}>
-            {voltage}kV → {Math.round(genAmps).toLocaleString()}A
-          </text>
-          <text x={x} y={y+r+33} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>
-            {type==="gas"?"HR: "+p.heatRate+" BTU/kWh":type==="solar"?"CF: "+(p.solarCF*100).toFixed(0)+"%":type==="wind"?"CF: "+(p.windCF*100).toFixed(0)+"%":"RTE: "+(p.batteryRTE*100)+"%"}
-          </text></g>
-        )}
-      </g>
-    );
-  };
-
-  const SolarArray = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-20} y={y-12} width={40} height={24} fill={isHovered?COLORS.solar+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.solar:COLORS.solar+"88"} strokeWidth={2} rx={3}/>
-        <line x1={x-12} y1={y-6} x2={x-12} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x-4} y1={y-6} x2={x-4} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x+4} y1={y-6} x2={x+4} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x+12} y1={y-6} x2={x+12} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <text x={x} y={y+20} textAnchor="middle" fill={isHovered?COLORS.solar:COLORS.text} fontSize={7} fontFamily={F.m} fontWeight={600}>PV Array</text>
-        <text x={x} y={y+28} textAnchor="middle" fill={COLORS.text} fontSize={6} fontFamily={F.m}>{mw} MW DC</text>
-      </g>
-    );
-  };
-
-  const WindTurbine = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y} r={16} fill={isHovered?COLORS.wind+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.wind:COLORS.wind+"88"} strokeWidth={2}/>
-        <circle cx={x} cy={y} r={3} fill={COLORS.wind}/>
-        <line x1={x} y1={y-3} x2={x} y2={y-14} stroke={COLORS.wind} strokeWidth={2}/>
-        <line x1={x} y1={y} x2={x+10} y2={y+8} stroke={COLORS.wind} strokeWidth={2}/>
-        <line x1={x} y1={y} x2={x-10} y2={y+8} stroke={COLORS.wind} strokeWidth={2}/>
-        <text x={x} y={y+26} textAnchor="middle" fill={isHovered?COLORS.wind:COLORS.text} fontSize={7} fontFamily={F.m} fontWeight={600}>Wind</text>
-        <text x={x} y={y+34} textAnchor="middle" fill={COLORS.text} fontSize={6} fontFamily={F.m}>{mw} MW</text>
-      </g>
-    );
-  };
-
-  const BatteryBank = ({x, y, mw, mwh, id}) => {
-    const isHovered = hoveredNode === id;
-    const duration = mw > 0 ? (mwh/mw).toFixed(1) : 0;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-22} y={y-12} width={44} height={24} rx={4} fill={isHovered?COLORS.battery+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.battery:COLORS.battery+"88"} strokeWidth={2}/>
-        <rect x={x+22} y={y-5} width={3} height={10} rx={1} fill={COLORS.battery}/>
-        <text x={x} y={y+3} textAnchor="middle" fill={COLORS.battery} fontSize={8} fontWeight={700} fontFamily={F.m}>BESS</text>
-        <text x={x} y={y+22} textAnchor="middle" fill={isHovered?COLORS.battery:COLORS.text} fontSize={7} fontFamily={F.m}>{mw}MW/{duration}hr</text>
-      </g>
-    );
-  };
-
-  const Inverter = ({x, y, label, id, mw}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-12} y={y-8} width={24} height={16} fill={isHovered?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.3)"} stroke={isHovered?"#E8E6E1":"#9CA3AF"} strokeWidth={1.5} rx={2}/>
-        <text x={x} y={y+3} textAnchor="middle" fill="#E8E6E1" fontSize={6} fontFamily={F.m}>{label||"INV"}</text>
-        {isHovered && mw && <text x={x} y={y+14} textAnchor="middle" fill="#667" fontSize={5} fontFamily={F.m}>{mw}MW</text>}
-      </g>
-    );
-  };
-
-  const DataCenter = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    const dcAmps480 = calcAmps(mw, 0.48);
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-50} y={y-20} width={100} height={40} rx={4} fill={isHovered?"rgba(249,115,22,0.15)":"rgba(0,0,0,0.3)"} stroke={isHovered?"#f97316":"#f9731688"} strokeWidth={2}/>
-        <text x={x} y={y-4} textAnchor="middle" fill="#f97316" fontSize={11} fontWeight={700} fontFamily={F.m}>DATA CENTER</text>
-        <text x={x} y={y+10} textAnchor="middle" fill="#f97316aa" fontSize={8} fontFamily={F.m}>{mw} MW Load</text>
-        {isHovered && (
-          <g>
-            <text x={x} y={y+30} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>@ 480V: {Math.round(dcAmps480/1000)}kA (split across PDUs)</text>
-            <text x={x} y={y+40} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>@ 12V DC per chip: ~mA each</text>
-          </g>
-        )}
-      </g>
-    );
-  };
-
-  const Wire = ({x1, y1, x2, y2, color=COLORS.wire, dashed=false, thick=false}) => (
-    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={thick?2.5:1.5} strokeDasharray={dashed?"4,3":"none"}/>
+  // Simple components
+  const Bus = ({x, y, w, color, label}) => (
+    <g>
+      <line x1={x} y1={y} x2={x+w} y2={y} stroke={color} strokeWidth={4} strokeLinecap="round"/>
+      <text x={x-5} y={y+4} fill={color} fontSize={9} fontFamily={F.m} fontWeight={600} textAnchor="end">{label}</text>
+    </g>
   );
 
-  const sources = [];
-  let xPos = busStartX + 100;
-  const numSources = [hasSolar, hasWind, hasBatt].filter(Boolean).length;
-  const spacing = numSources > 0 ? (busWidth - 200) / Math.max(numSources, 1) : 0;
-  if (hasSolar) { sources.push({type:"solar", x: xPos}); xPos += spacing; }
-  if (hasWind) { sources.push({type:"wind", x: xPos}); xPos += spacing; }
-  if (hasBatt) { sources.push({type:"battery", x: xPos}); }
+  const Gen = ({x, y, label, mw, color, sub}) => {
+    const isHovered = hoveredNode === label;
+    return (
+      <g onMouseEnter={()=>setHoveredNode(label)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
+        <circle cx={x} cy={y} r={16} fill={isHovered?color+"33":"#1a1d25"} stroke={color} strokeWidth={2}/>
+        <text x={x} y={y+4} textAnchor="middle" fill={color} fontSize={9} fontWeight={700} fontFamily={F.m}>G</text>
+        <text x={x} y={y+28} textAnchor="middle" fill={color} fontSize={8} fontFamily={F.m}>{label}</text>
+        <text x={x} y={y+38} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>{mw}MW</text>
+        {sub && <text x={x} y={y+48} textAnchor="middle" fill="#556" fontSize={6} fontFamily={F.m}>{sub}</text>}
+      </g>
+    );
+  };
 
-  const dcCenterX = W/2;
+  const Xfmr = ({x, y, label}) => (
+    <g>
+      <circle cx={x} cy={y-4} r={6} fill="none" stroke="#f0c040" strokeWidth={1.5}/>
+      <circle cx={x} cy={y+4} r={6} fill="none" stroke="#f0c040" strokeWidth={1.5}/>
+      {label && <text x={x+10} y={y+3} fill="#889" fontSize={7} fontFamily={F.m}>{label}</text>}
+    </g>
+  );
+
+  const Wire = ({x1, y1, x2, y2, color="#556677"}) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1.5}/>
+  );
+
+  const Box = ({x, y, w, h, label, sub, color}) => (
+    <g>
+      <rect x={x-w/2} y={y-h/2} width={w} height={h} rx={4} fill={color+"15"} stroke={color+"66"} strokeWidth={1.5}/>
+      <text x={x} y={y-2} textAnchor="middle" fill={color} fontSize={9} fontWeight={600} fontFamily={F.m}>{label}</text>
+      {sub && <text x={x} y={y+10} textAnchor="middle" fill="#778" fontSize={7} fontFamily={F.m}>{sub}</text>}
+    </g>
+  );
+
+  // Gas equipment counts
+  const hCount = gasEquip?.hframe || 0;
+  const fCount = gasEquip?.fframe || 0;
+  const aCount = gasEquip?.aero || 0;
+  const rCount = gasEquip?.recip || 0;
 
   return (
-    <div style={{padding:16, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+    <div style={{padding:12, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8}}>
+      {/* Header */}
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
         <div>
-          <div style={{fontSize:13, fontWeight:700, color:"#E8E6E1", fontFamily:F.m}}>Single Line Diagram — {configId.toUpperCase()}</div>
-          <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m}}>Current Flow Analysis • {totalGenMW.toLocaleString()} MW generation → {L} MW load</div>
+          <div style={{fontSize:12, fontWeight:700, color:"#E8E6E1", fontFamily:F.m}}>Single Line Diagram — {configId.toUpperCase()}</div>
+          <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m}}>{totalGenMW.toLocaleString()} MW generation → {L} MW load</div>
         </div>
-        <div style={{display:"flex", gap:12}}>
-          <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
-            <input type="checkbox" checked={showVoltages} onChange={()=>setShowVoltages(!showVoltages)} style={{accentColor:"#14ffb4"}}/>
-            Voltages
-          </label>
-          <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
-            <input type="checkbox" checked={showCurrents} onChange={()=>setShowCurrents(!showCurrents)} style={{accentColor:"#f97316"}}/>
-            Currents
-          </label>
-        </div>
+        <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
+          <input type="checkbox" checked={showCurrents} onChange={()=>setShowCurrents(!showCurrents)} style={{accentColor:"#f97316"}}/>
+          Show Amps
+        </label>
       </div>
 
-      {/* Current Funnel Summary */}
-      <div style={{background:"rgba(0,0,0,0.3)", borderRadius:6, padding:10, marginBottom:12, border:"1px solid rgba(255,255,255,0.05)"}}>
-        <div style={{fontSize:9, fontWeight:700, color:"#889", marginBottom:8, textTransform:"uppercase", letterSpacing:1}}>Current Funnel — High Current → Distributed Low Current</div>
-        <div style={{display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", fontSize:9}}>
-          <span style={{color:COLORS.bus230}}>230kV: <b>{Math.round(hvAmps).toLocaleString()}A</b></span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:COLORS.bus34}}>34.5kV: <b>{Math.round(mvAmps).toLocaleString()}A</b></span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:COLORS.bus12}}>12.47kV: <b>{Math.round(distAmps).toLocaleString()}A</b> ({numMainXfmrs} xfmrs)</span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:"#ff9f43"}}>{numFeeders} feeders @ <b>{Math.round(ampsPerFeeder)}A</b> each</span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:"#54a0ff"}}>480V PDUs → 12V DC chips</span>
+      {/* Current Flow Summary */}
+      {showCurrents && (
+        <div style={{background:"#1a1d25", borderRadius:4, padding:8, marginBottom:8, fontSize:9, fontFamily:F.m}}>
+          <span style={{color:"#889"}}>Current Flow: </span>
+          <span style={{color:COLORS.bus34}}>34.5kV: {Math.round(mvAmps).toLocaleString()}A</span>
+          <span style={{color:"#445"}}> → </span>
+          <span style={{color:COLORS.bus12}}>12.47kV: {Math.round(distAmps).toLocaleString()}A</span>
+          <span style={{color:"#445"}}> → </span>
+          <span style={{color:"#889"}}>{numXfmrs} transformers needed</span>
         </div>
-      </div>
+      )}
 
-      <div style={{overflowX:"auto", background:"rgba(0,0,0,0.25)", borderRadius:8, border:"1px solid rgba(255,255,255,0.05)", padding:8}}>
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
+      <div style={{overflowX:"auto", background:"#0d0f13", borderRadius:6, padding:8}}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+          {/* Grid */}
           <defs>
-            <pattern id="sld-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5"/>
+            <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1a1d25" strokeWidth="0.5"/>
             </pattern>
           </defs>
-          <rect width={W} height={H} fill="url(#sld-grid)"/>
+          <rect width={W} height={H} fill="url(#grid)"/>
 
-          <text x={W/2} y={24} textAnchor="middle" fill="#445" fontSize={10} fontFamily={F.m} letterSpacing={2}>
-            HYBRID POWER PLANT — {L} MW LOAD — CURRENT FLOW ANALYSIS
-          </text>
+          {/* ===== GENERATION LEVEL ===== */}
+          <text x={margin} y={Y.gen-15} fill="#445" fontSize={8} fontFamily={F.m}>GENERATION</text>
 
-          {/* ====== GENERATION TIER ====== */}
-          <text x={busStartX} y={BUS_Y.hv-22} fill="#556" fontSize={8} fontFamily={F.m}>GENERATION & COLLECTION</text>
-
-          {/* 230kV HV BUS */}
-          <Bus x={busStartX} y={BUS_Y.hv} width={busWidth} color={COLORS.bus230} label="230kV" thickness={5} amps={hvAmps} rating={RATINGS["230kV"]}/>
-
-          {/* 34.5kV COLLECTION BUS */}
-          <Bus x={busStartX} y={BUS_Y.mv} width={busWidth} color={COLORS.bus34} label="34.5kV" thickness={4} amps={mvAmps} rating={RATINGS["34.5kV"]}/>
-
-          {/* Tie transformer HV to MV */}
-          <Wire x1={busStartX + busWidth*0.85} y1={BUS_Y.hv} x2={busStartX + busWidth*0.85} y2={BUS_Y.hv+18} color={COLORS.bus230} thick/>
-          <Breaker x={busStartX + busWidth*0.85} y={BUS_Y.hv+12} id="cb-tie-hv" label="TIE CB" amps={hvAmps}/>
-          <Transformer x={busStartX + busWidth*0.85} y={BUS_Y.hv+46} label="TIE" voltages="230-34.5kV" id="xfmr-tie" mva={Math.round(totalGenMW*1.1)}/>
-          <Wire x1={busStartX + busWidth*0.85} y1={BUS_Y.hv+60} x2={busStartX + busWidth*0.85} y2={BUS_Y.mv} color={COLORS.bus34} thick/>
-
-          {/* SOLAR BRANCH */}
-          {hasSolar && (() => {
-            const sx = sources.find(s=>s.type==="solar")?.x || busStartX+120;
-            const arrayY = BUS_Y.mv - 85;
-            const solarAmps = calcAmps(solarMW, 34.5);
-            return (
-              <g>
-                <SolarArray x={sx} y={arrayY} mw={solarMW} id="solar-array"/>
-                <Wire x1={sx} y1={arrayY+14} x2={sx} y2={arrayY+32}/>
-                <Inverter x={sx} y={arrayY+40} label="INV" id="solar-inv" mw={solarMW}/>
-                <Wire x1={sx} y1={arrayY+48} x2={sx} y2={BUS_Y.mv-24}/>
-                <Transformer x={sx} y={BUS_Y.mv-14} label="SSU" voltages="0.6-34.5kV" id="xfmr-solar" r={9}/>
-                <Breaker x={sx} y={BUS_Y.mv-2} id="cb-solar" label="SOLAR" amps={solarAmps}/>
-              </g>
-            );
-          })()}
-
-          {/* WIND BRANCH */}
-          {hasWind && (() => {
-            const wx = sources.find(s=>s.type==="wind")?.x || busStartX+300;
-            const turbY = BUS_Y.mv - 85;
-            const windAmps = calcAmps(windMW, 34.5);
-            return (
-              <g>
-                <WindTurbine x={wx} y={turbY} mw={windMW} id="wind-turbine"/>
-                <Wire x1={wx} y1={turbY+18} x2={wx} y2={BUS_Y.mv-24}/>
-                <Transformer x={wx} y={BUS_Y.mv-14} label="PAD" voltages="0.69-34.5kV" id="xfmr-wind" r={9}/>
-                <Breaker x={wx} y={BUS_Y.mv-2} id="cb-wind" label="WIND" amps={windAmps}/>
-              </g>
-            );
-          })()}
-
-          {/* BATTERY BRANCH */}
-          {hasBatt && (() => {
-            const bx = sources.find(s=>s.type==="battery")?.x || busStartX+480;
-            const battY = BUS_Y.mv - 80;
-            const battAmps = calcAmps(battMW, 34.5);
-            return (
-              <g>
-                <BatteryBank x={bx} y={battY} mw={battMW} mwh={battMWh} id="battery"/>
-                <Wire x1={bx} y1={battY+14} x2={bx} y2={battY+30} color={COLORS.battery}/>
-                <Inverter x={bx} y={battY+38} label="PCS" id="batt-pcs" mw={battMW}/>
-                <Wire x1={bx} y1={battY+46} x2={bx} y2={BUS_Y.mv-24}/>
-                <Transformer x={bx} y={BUS_Y.mv-14} label="BESS" voltages="0.48-34.5kV" id="xfmr-batt" r={9}/>
-                <Breaker x={bx} y={BUS_Y.mv-2} id="cb-batt" label="BESS" amps={battAmps}/>
-              </g>
-            );
-          })()}
-
-          {/* GAS GENERATION - with individual generators at appropriate voltage levels */}
-          {hasGas && gasEquip && (() => {
-            const hCount = gasEquip.hframe || 0;
-            const fCount = gasEquip.fframe || 0;
-            const aCount = gasEquip.aero || 0;
-            const rCount = gasEquip.recip || 0;
-            const hasH = hCount > 0, hasF = fCount > 0, hasA = aCount > 0, hasR = rCount > 0;
-            const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
-
-            // Position gas equipment in middle-right of diagram
-            const gasStartX = busStartX + busWidth * 0.5;
-            const gasAmpsAtMV = calcAmps(gasMW, 34.5);
-            const hAmps = hCount > 0 ? calcAmps(hCount * 400, 345) : 0;
-            const fAmps = fCount > 0 ? calcAmps(fCount * 200, 138) : 0;
-
-            return (
-              <g>
-                {/* H-Frame generators - 345kV (shown above 230kV bus) */}
-                {hasH && (
-                  <g>
-                    <line x1={gasStartX} y1={BUS_Y.hv-70} x2={gasStartX+Math.min(hCount,3)*80} y2={BUS_Y.hv-70} stroke="#ff6b6b" strokeWidth={4}/>
-                    {showCurrents && <text x={gasStartX+Math.min(hCount,3)*80+8} y={BUS_Y.hv-68} fill="#ff6b6b" fontSize={7} fontFamily={F.m}>345kV {Math.round(hAmps)}A</text>}
-                    {Array.from({length: Math.min(hCount, 3)}).map((_, i) => {
-                      const hx = gasStartX + 30 + i * 80;
-                      return (
-                        <g key={"hframe-"+i}>
-                          <Generator x={hx} y={BUS_Y.hv-120} label={"H-"+(i+1)} mw={400} type="gas" id={"gen-h"+i} voltage={18}/>
-                          <Wire x1={hx} y1={BUS_Y.hv-100} x2={hx} y2={BUS_Y.hv-85}/>
-                          <Transformer x={hx} y={BUS_Y.hv-78} label="GSU" voltages="18-345kV" id={"xfmr-h"+i} r={7}/>
-                          <Wire x1={hx} y1={BUS_Y.hv-70} x2={hx} y2={BUS_Y.hv-70}/>
-                        </g>
-                      );
-                    })}
-                    {hCount > 3 && <text x={gasStartX+Math.min(hCount,3)*80-20} y={BUS_Y.hv-130} fill="#667" fontSize={7} fontFamily={F.m}>(+{hCount-3} more H-Frames)</text>}
-                    <Wire x1={gasStartX+60} y1={BUS_Y.hv-70} x2={gasStartX+60} y2={BUS_Y.hv-15} color="#ff6b6b"/>
-                    <Transformer x={gasStartX+60} y={BUS_Y.hv-8} label="AUTO" voltages="345-230kV" id="xfmr-345-230" r={7}/>
-                    <Wire x1={gasStartX+60} y1={BUS_Y.hv} x2={gasStartX+60} y2={BUS_Y.hv}/>
-                  </g>
-                )}
-
-                {/* F-Frame generators - 138kV (shown between HV and MV) */}
-                {hasF && (
-                  <g>
-                    <line x1={busStartX+80} y1={BUS_Y.hv+50} x2={busStartX+80+Math.min(fCount,4)*70} y2={BUS_Y.hv+50} stroke="#f0c040" strokeWidth={4}/>
-                    {showCurrents && <text x={busStartX+80+Math.min(fCount,4)*70+8} y={BUS_Y.hv+52} fill="#f0c040" fontSize={7} fontFamily={F.m}>138kV {Math.round(fAmps)}A</text>}
-                    {Array.from({length: Math.min(fCount, 4)}).map((_, i) => {
-                      const fx = busStartX + 110 + i * 70;
-                      return (
-                        <g key={"fframe-"+i}>
-                          <Generator x={fx} y={BUS_Y.hv+10} label={"F-"+(i+1)} mw={200} type="gas" id={"gen-f"+i} voltage={13.8}/>
-                          <Wire x1={fx} y1={BUS_Y.hv+28} x2={fx} y2={BUS_Y.hv+38}/>
-                          <Transformer x={fx} y={BUS_Y.hv+44} label="" voltages="13.8-138kV" id={"xfmr-f"+i} r={5}/>
-                          <Wire x1={fx} y1={BUS_Y.hv+50} x2={fx} y2={BUS_Y.hv+50}/>
-                        </g>
-                      );
-                    })}
-                    {fCount > 4 && <text x={busStartX+80+Math.min(fCount,4)*70-30} y={BUS_Y.hv} fill="#667" fontSize={7} fontFamily={F.m}>(+{fCount-4} more F-Frames)</text>}
-                    <Wire x1={busStartX+180} y1={BUS_Y.hv+50} x2={busStartX+180} y2={BUS_Y.mv-15} color="#f0c040"/>
-                    <Transformer x={busStartX+180} y={BUS_Y.mv-8} label="TIE" voltages="138-34.5kV" id="xfmr-138-34" r={7}/>
-                    <Wire x1={busStartX+180} y1={BUS_Y.mv} x2={busStartX+180} y2={BUS_Y.mv}/>
-                  </g>
-                )}
-
-                {/* Aero generators - connect directly to 34.5kV */}
-                {hasA && (
-                  <g>
-                    {Array.from({length: Math.min(aCount, 5)}).map((_, i) => {
-                      const ax = busStartX + busWidth*0.65 + i * 50;
-                      return (
-                        <g key={"aero-"+i}>
-                          <Generator x={ax} y={BUS_Y.mv-50} label={"A-"+(i+1)} mw={50} type="gas" id={"gen-a"+i} voltage={13.8}/>
-                          <Wire x1={ax} y1={BUS_Y.mv-32} x2={ax} y2={BUS_Y.mv-15}/>
-                          <Transformer x={ax} y={BUS_Y.mv-8} label="" voltages="13.8-34.5kV" id={"xfmr-a"+i} r={5}/>
-                          <Wire x1={ax} y1={BUS_Y.mv} x2={ax} y2={BUS_Y.mv}/>
-                        </g>
-                      );
-                    })}
-                    {aCount > 5 && <text x={busStartX+busWidth*0.65+Math.min(aCount,5)*50} y={BUS_Y.mv-55} fill={equipColors.aero} fontSize={7} fontFamily={F.m}>+{aCount-5} Aeros</text>}
-                  </g>
-                )}
-
-                {/* Recip generators - show summary (too many to draw individually) */}
-                {hasR && (
-                  <g>
-                    <rect x={busStartX+busWidth*0.4} y={BUS_Y.mv-75} width={100} height={55} rx={4} fill="rgba(34,197,94,0.1)" stroke={equipColors.recip+"44"}/>
-                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-60} textAnchor="middle" fill={equipColors.recip} fontSize={8} fontWeight={600} fontFamily={F.m}>{rCount}× RECIP</text>
-                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-48} textAnchor="middle" fill="#889" fontSize={7} fontFamily={F.m}>{rCount*20}MW @ 480V</text>
-                    <text x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-36} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>5 min start</text>
-                    <Wire x1={busStartX+busWidth*0.4+50} y1={BUS_Y.mv-20} x2={busStartX+busWidth*0.4+50} y2={BUS_Y.mv}/>
-                    <Breaker x={busStartX+busWidth*0.4+50} y={BUS_Y.mv-10} id="cb-recip" label="RECIP"/>
-                  </g>
-                )}
-
-                {/* Gas summary in corner */}
-                {showCurrents && <text x={W-20} y={BUS_Y.mv+15} textAnchor="end" fill={COLORS.gas} fontSize={8} fontFamily={F.m}>Gas Total: {gasMW}MW → {Math.round(gasAmpsAtMV)}A @ 34.5kV</text>}
-              </g>
-            );
-          })()}
-
-          {/* ====== DISTRIBUTION TIER ====== */}
-          <text x={busStartX} y={BUS_Y.dist-22} fill="#556" fontSize={8} fontFamily={F.m}>DISTRIBUTION — {showMainXfmrs} of {numMainXfmrs} MAIN TRANSFORMERS shown</text>
-
-          {/* 12.47kV DISTRIBUTION BUS */}
-          <Bus x={busStartX+100} y={BUS_Y.dist} width={busWidth-200} color={COLORS.bus12} label="12.47kV" thickness={4} amps={distAmps} rating={RATINGS["12.47kV"]}/>
-
-          {/* Multiple Main Transformers from 34.5kV to 12.47kV */}
-          {Array.from({length: showMainXfmrs}).map((_, i) => {
-            const xfmrX = busStartX + 150 + i * ((busWidth-300) / (showMainXfmrs-1 || 1));
-            const xfmrMVA = Math.round(L / numMainXfmrs * 1.25);
-            const xfmrAmps = distAmps / numMainXfmrs;
-            return (
-              <g key={"main-xfmr-"+i}>
-                <Wire x1={xfmrX} y1={BUS_Y.mv} x2={xfmrX} y2={BUS_Y.mv+16} color={COLORS.bus34}/>
-                <Breaker x={xfmrX} y={BUS_Y.mv+10} id={"cb-main-hv-"+i} label={"MAIN "+(i+1)} amps={xfmrAmps}/>
-                <Transformer x={xfmrX} y={(BUS_Y.mv+BUS_Y.dist)/2} label={"MAIN "+(i+1)} voltages="34.5-12.47kV" id={"xfmr-main-"+i} mva={xfmrMVA}/>
-                <Wire x1={xfmrX} y1={(BUS_Y.mv+BUS_Y.dist)/2+14} x2={xfmrX} y2={BUS_Y.dist-10} color={COLORS.bus12}/>
-                <Breaker x={xfmrX} y={BUS_Y.dist-6} id={"cb-main-lv-"+i} label="LV" amps={xfmrAmps}/>
-              </g>
-            );
-          })}
-
-          {/* ====== DATA CENTER TIER ====== */}
-          <text x={busStartX} y={BUS_Y.dc-22} fill="#556" fontSize={8} fontFamily={F.m}>DATA CENTER DISTRIBUTION — {numFeeders} FEEDERS @ {Math.round(ampsPerFeeder)}A EACH</text>
-
-          {/* 480V BUS (conceptual) */}
-          <Bus x={busStartX+150} y={BUS_Y.dc} width={busWidth-300} color={"#ff9f43"} label="480V" thickness={3}/>
-
-          {/* Feeders from 12.47kV to 480V */}
-          {Array.from({length: showFeeders}).map((_, i) => {
-            const feederX = busStartX + 180 + i * ((busWidth-360) / (showFeeders-1 || 1));
-            return (
-              <g key={"feeder-"+i}>
-                <Wire x1={feederX} y1={BUS_Y.dist} x2={feederX} y2={BUS_Y.dist+14} color={COLORS.bus12}/>
-                <Breaker x={feederX} y={BUS_Y.dist+10} size={6} id={"cb-feeder-"+i} label={"F"+(i+1)} amps={ampsPerFeeder}/>
-                <Transformer x={feederX} y={(BUS_Y.dist+BUS_Y.dc)/2} label="" voltages="12.47kV-480V" id={"xfmr-feeder-"+i} r={8}/>
-                <Wire x1={feederX} y1={(BUS_Y.dist+BUS_Y.dc)/2+10} x2={feederX} y2={BUS_Y.dc} color={"#ff9f43"}/>
-              </g>
-            );
-          })}
-          {numFeeders > showFeeders && (
-            <text x={W/2} y={(BUS_Y.dist+BUS_Y.dc)/2+24} textAnchor="middle" fill="#667" fontSize={8} fontFamily={F.m}>
-              (showing {showFeeders} of {numFeeders} feeders needed)
-            </text>
+          {/* Solar */}
+          {hasSolar && (
+            <g>
+              <Gen x={margin+60} y={Y.gen} label="SOLAR" mw={solarMW} color={COLORS.solar} sub={`CF ${(p.solarCF*100).toFixed(0)}%`}/>
+              <Wire x1={margin+60} y1={Y.gen+18} x2={margin+60} y2={Y.hv-20}/>
+              <Xfmr x={margin+60} y={Y.hv-12} label="SSU"/>
+              <Wire x1={margin+60} y1={Y.hv-4} x2={margin+60} y2={Y.hv}/>
+            </g>
           )}
 
-          {/* PDU Level */}
-          <text x={busStartX} y={BUS_Y.load-22} fill="#556" fontSize={8} fontFamily={F.m}>PDU & RACK DISTRIBUTION — Final current split to servers</text>
+          {/* Wind */}
+          {hasWind && (
+            <g>
+              <Gen x={margin+160} y={Y.gen} label="WIND" mw={windMW} color={COLORS.wind} sub={`CF ${(p.windCF*100).toFixed(0)}%`}/>
+              <Wire x1={margin+160} y1={Y.gen+18} x2={margin+160} y2={Y.hv-20}/>
+              <Xfmr x={margin+160} y={Y.hv-12} label="PAD"/>
+              <Wire x1={margin+160} y1={Y.hv-4} x2={margin+160} y2={Y.hv}/>
+            </g>
+          )}
 
-          {/* PDUs */}
-          {Array.from({length: 5}).map((_, i) => {
-            const pduX = busStartX + 200 + i * 160;
-            const pduMW = L / 5;
-            const pduAmps = calcAmps(pduMW, 0.48);
+          {/* Battery */}
+          {hasBatt && (
+            <g>
+              <Box x={margin+260} y={Y.gen} w={50} h={30} label="BESS" sub={`${battMW}MW`} color={COLORS.battery}/>
+              <Wire x1={margin+260} y1={Y.gen+18} x2={margin+260} y2={Y.hv-20}/>
+              <Xfmr x={margin+260} y={Y.hv-12} label="PCS"/>
+              <Wire x1={margin+260} y1={Y.hv-4} x2={margin+260} y2={Y.hv}/>
+            </g>
+          )}
+
+          {/* Gas Generation - Right Side */}
+          {hasGas && (
+            <g>
+              {/* Gas summary box */}
+              <rect x={W-margin-220} y={Y.gen-25} width={200} height={75} rx={4} fill="rgba(194,75,75,0.08)" stroke="#C24B4B33"/>
+              <text x={W-margin-120} y={Y.gen-8} textAnchor="middle" fill={COLORS.gas} fontSize={10} fontWeight={700} fontFamily={F.m}>GAS GENERATION</text>
+              <text x={W-margin-120} y={Y.gen+8} textAnchor="middle" fill="#889" fontSize={8} fontFamily={F.m}>{gasMW} MW Total</text>
+
+              {/* Equipment breakdown */}
+              <text x={W-margin-200} y={Y.gen+25} fill="#6366f1" fontSize={8} fontFamily={F.m}>
+                {hCount > 0 ? `${hCount}× H-Frame` : ""}
+              </text>
+              <text x={W-margin-120} y={Y.gen+25} fill="#f97316" fontSize={8} fontFamily={F.m}>
+                {fCount > 0 ? `${fCount}× F-Frame` : ""}
+              </text>
+              <text x={W-margin-200} y={Y.gen+38} fill="#06b6d4" fontSize={8} fontFamily={F.m}>
+                {aCount > 0 ? `${aCount}× Aero` : ""}
+              </text>
+              <text x={W-margin-120} y={Y.gen+38} fill="#22c55e" fontSize={8} fontFamily={F.m}>
+                {rCount > 0 ? `${rCount}× Recip` : ""}
+              </text>
+
+              {/* Connection to HV bus */}
+              <Wire x1={W-margin-120} y1={Y.gen+50} x2={W-margin-120} y2={Y.hv-20} color={COLORS.gas}/>
+              <Xfmr x={W-margin-120} y={Y.hv-12} label="GSU"/>
+              <Wire x1={W-margin-120} y1={Y.hv-4} x2={W-margin-120} y2={Y.hv}/>
+            </g>
+          )}
+
+          {/* ===== 230kV BUS ===== */}
+          <Bus x={margin} y={Y.hv} w={W-margin*2} color={COLORS.bus230} label="230kV"/>
+          {showCurrents && <text x={W-margin+5} y={Y.hv+4} fill={COLORS.bus230} fontSize={8} fontFamily={F.m}>{Math.round(calcAmps(totalGenMW, 230))}A</text>}
+
+          {/* Tie transformer 230kV to 34.5kV */}
+          <Wire x1={W/2} y1={Y.hv} x2={W/2} y2={Y.mv-20} color={COLORS.bus230}/>
+          <Xfmr x={W/2} y={(Y.hv+Y.mv)/2} label="MAIN TIE"/>
+
+          {/* ===== 34.5kV BUS ===== */}
+          <Bus x={margin} y={Y.mv} w={W-margin*2} color={COLORS.bus34} label="34.5kV"/>
+          {showCurrents && <text x={W-margin+5} y={Y.mv+4} fill={COLORS.bus34} fontSize={8} fontFamily={F.m}>{Math.round(mvAmps)}A</text>}
+
+          {/* Multiple distribution transformers */}
+          {[0,1,2].map(i => {
+            const x = margin + 150 + i * 250;
             return (
-              <g key={"pdu-"+i}>
-                <Wire x1={pduX} y1={BUS_Y.dc} x2={pduX} y2={BUS_Y.dc+20} color={"#ff9f43"}/>
-                <rect x={pduX-20} y={BUS_Y.dc+22} width={40} height={20} rx={3} fill="rgba(0,0,0,0.4)" stroke="#54a0ff88" strokeWidth={1}/>
-                <text x={pduX} y={BUS_Y.dc+35} textAnchor="middle" fill="#54a0ff" fontSize={7} fontWeight={600} fontFamily={F.m}>PDU-{i+1}</text>
-                <text x={pduX} y={BUS_Y.dc+50} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>{Math.round(pduAmps)}A</text>
-                <Wire x1={pduX} y1={BUS_Y.dc+42} x2={pduX} y2={BUS_Y.load-30} color="#54a0ff" dashed/>
+              <g key={"dist-"+i}>
+                <Wire x1={x} y1={Y.mv} x2={x} y2={Y.dist-20} color={COLORS.bus34}/>
+                <Xfmr x={x} y={(Y.mv+Y.dist)/2} label={`XFMR ${i+1}`}/>
+                <Wire x1={x} y1={(Y.mv+Y.dist)/2+12} x2={x} y2={Y.dist}/>
+              </g>
+            );
+          })}
+          {numXfmrs > 3 && <text x={W/2} y={(Y.mv+Y.dist)/2+30} textAnchor="middle" fill="#556" fontSize={8} fontFamily={F.m}>(showing 3 of {numXfmrs} transformers)</text>}
+
+          {/* ===== 12.47kV BUS ===== */}
+          <Bus x={margin+100} y={Y.dist} w={W-margin*2-200} color={COLORS.bus12} label="12.47kV"/>
+          {showCurrents && <text x={W-margin-100+5} y={Y.dist+4} fill={COLORS.bus12} fontSize={8} fontFamily={F.m}>{Math.round(distAmps)}A</text>}
+
+          {/* Feeders to data center */}
+          {[0,1,2,3,4].map(i => {
+            const x = margin + 150 + i * 150;
+            return (
+              <g key={"feed-"+i}>
+                <Wire x1={x} y1={Y.dist} x2={x} y2={Y.dc-15} color={COLORS.bus12}/>
+                <rect x={x-15} y={Y.dc-12} width={30} height={16} rx={2} fill="#1a1d25" stroke="#ff9f4366"/>
+                <text x={x} y={Y.dc-1} textAnchor="middle" fill="#ff9f43" fontSize={7} fontFamily={F.m}>480V</text>
               </g>
             );
           })}
 
-          <DataCenter x={dcCenterX} y={BUS_Y.load} mw={L} id="dc-load"/>
+          {/* ===== DATA CENTER ===== */}
+          <rect x={W/2-80} y={Y.dc+10} width={160} height={50} rx={6} fill="rgba(249,115,22,0.1)" stroke="#f9731666" strokeWidth={2}/>
+          <text x={W/2} y={Y.dc+35} textAnchor="middle" fill="#f97316" fontSize={12} fontWeight={700} fontFamily={F.m}>DATA CENTER</text>
+          <text x={W/2} y={Y.dc+50} textAnchor="middle" fill="#f97316aa" fontSize={9} fontFamily={F.m}>{L} MW Load</text>
 
-          {/* Current flow arrows annotation */}
-          <text x={W-80} y={BUS_Y.hv+40} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">↓ Current increases</text>
-          <text x={W-80} y={BUS_Y.hv+50} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">as voltage drops</text>
-          <text x={W-80} y={BUS_Y.dist+40} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">↓ But splitting into</text>
-          <text x={W-80} y={BUS_Y.dist+50} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">parallel paths keeps</text>
-          <text x={W-80} y={BUS_Y.dist+60} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">each circuit in ratings</text>
+          {/* Voltage level labels on right */}
+          <text x={W-15} y={Y.hv+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Transmission</text>
+          <text x={W-15} y={Y.mv+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Collection</text>
+          <text x={W-15} y={Y.dist+20} fill="#334" fontSize={7} fontFamily={F.m} textAnchor="end">Distribution</text>
 
           {!hasSolar && !hasWind && !hasGas && !hasBatt && (
-            <text x={W/2} y={H/2} textAnchor="middle" fill="#445" fontSize={12} fontFamily={F.m}>
-              Configure generation sources to see single line diagram
+            <text x={W/2} y={H/2} textAnchor="middle" fill="#445" fontSize={11} fontFamily={F.m}>
+              Configure generation sources to see diagram
             </text>
           )}
         </svg>
       </div>
 
-      {/* Enhanced Legend */}
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginTop:12}}>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Symbols</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:"#778"}}><span style={{color:"#E8E6E1"}}>G</span> Generator</span>
-            <span style={{color:"#778"}}><span style={{color:"#f0c040"}}>OO</span> Transformer</span>
-            <span style={{color:"#778"}}><span style={{color:"#E8E6E1"}}>[]</span> Breaker</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Voltage Levels</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:COLORS.bus230}}>━ 230kV Transmission</span>
-            <span style={{color:COLORS.bus34}}>━ 34.5kV Collection</span>
-            <span style={{color:COLORS.bus12}}>━ 12.47kV Distribution</span>
-            <span style={{color:"#ff9f43"}}>━ 480V Building</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Current Ratings</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:COLORS.ok}}>● Within Rating</span>
-            <span style={{color:COLORS.warning}}>● Near Limit (80%+)</span>
-            <span style={{color:COLORS.danger}}>● Over Rating</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Formula</div>
-          <div style={{fontSize:8, color:"#778"}}>
-            Amps = MW × 1000 / (√3 × kV × PF)
-          </div>
-          <div style={{fontSize:7, color:"#556", marginTop:2}}>
-            PF ≈ 0.9 typical
-          </div>
-        </div>
+      {/* Compact Legend */}
+      <div style={{display:"flex", gap:16, marginTop:8, fontSize:8, color:"#667", fontFamily:F.m}}>
+        <span><span style={{color:COLORS.solar}}>●</span> Solar</span>
+        <span><span style={{color:COLORS.wind}}>●</span> Wind</span>
+        <span><span style={{color:COLORS.battery}}>●</span> Battery</span>
+        <span><span style={{color:COLORS.gas}}>●</span> Gas</span>
+        <span style={{marginLeft:"auto"}}>Amps = MW × 1000 / (√3 × kV × 0.9)</span>
       </div>
     </div>
   );
