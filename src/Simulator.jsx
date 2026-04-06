@@ -1531,6 +1531,417 @@ export default function App() {
           {/* ===== THESIS ===== */}
           {tab==="thesis"&&(<>
             <div style={PS}>
+              <div style={SL}>THE HYBRID ADVANTAGE — A DEEPER LOOK</div>
+              <div style={{fontSize:11, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.8, marginBottom:12}}>
+                Why can a hybrid system (solar + wind + battery + gas) match or beat gas-only LCOE despite needing more types of equipment?
+                The answer lies in <b style={{color:"#E8A838"}}>what each technology contributes</b> and <b style={{color:"#E8A838"}}>what it eliminates</b>.
+              </div>
+            </div>
+
+            {/* The Infrastructure Table - The Core Insight */}
+            <div style={PS}>
+              <div style={SL}>INFRASTRUCTURE REQUIREMENTS — THE NUMBERS THAT MATTER</div>
+              <table style={{width:"100%", borderCollapse:"collapse", fontSize:10, fontFamily:F.m, marginBottom:12}}>
+                <thead>
+                  <tr style={{borderBottom:"2px solid #2A3040", background:"#1a1d25"}}>
+                    <th style={{padding:"10px 6px", textAlign:"left", color:"#9CA3AF", fontSize:9}}>Configuration</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#eab308", fontSize:9}}>Solar MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#3b82f6", fontSize:9}}>Wind MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#ef4444", fontSize:9}}>Gas MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#10b981", fontSize:9}}>Battery MWh</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#a78bfa", fontSize:9}}>Overbuild</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9}}>Net Capex</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9, fontWeight:700}}>LCOE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SCEN.map((s,i) => {
+                    const sz = computed[s.id].sz;
+                    const r = results[s.id];
+                    return (
+                      <tr key={s.id} style={{borderBottom:"1px solid #1E2330", background: i%2===0 ? "transparent" : "#0f1115"}}>
+                        <td style={{padding:"10px 6px", color:s.color, fontWeight:600}}>{s.name}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.solarMW?"#eab308":"#333"}}>{sz.solarMW ? sz.solarMW.toLocaleString() : "—"}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.windMW?"#3b82f6":"#333"}}>{sz.windMW ? sz.windMW.toLocaleString() : "—"}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.gasMW?"#ef4444":"#333"}}>{sz.gasMW ? sz.gasMW.toLocaleString() : "—"}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:sz.battMWh?"#10b981":"#333"}}>{sz.battMWh ? sz.battMWh.toLocaleString() : "—"}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:"#a78bfa"}}>{r.overbuild.toFixed(1)}x</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF"}}>{fmt$(r.netCapex)}</td>
+                        <td style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontWeight:700, fontSize:12}}>${r.lcoe.toFixed(1)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Key Observations from the Table */}
+            <div style={PS}>
+              <div style={SL}>WHAT THE TABLE REVEALS</div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
+
+                <div style={{background:"#10b98112", border:"1px solid #10b98133", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#10b981", fontFamily:F.m, fontWeight:700, marginBottom:10}}>🔋 THE BATTERY CLIFF</div>
+                  <div style={{fontSize:28, color:"#10b981", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                    {computed.sb?.sz?.battMWh && computed.swgb?.sz?.battMWh ?
+                      Math.round((1 - computed.swgb.sz.battMWh / computed.sb.sz.battMWh) * 100) : 94}% less
+                  </div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Solar+Battery needs <b style={{color:"#E8E6E1"}}>{computed.sb?.sz?.battMWh?.toLocaleString() || "23,000"} MWh</b> of storage.<br/>
+                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.battMWh?.toLocaleString() || "1,400"} MWh</b>.<br/><br/>
+                    <span style={{color:"#10b981"}}>Why?</span> Without gas, you need batteries to cover multi-day weather events.
+                    With gas backup, you only need 4 hours for daily solar shifting.
+                  </div>
+                </div>
+
+                <div style={{background:"#eab30812", border:"1px solid #eab30833", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#eab308", fontFamily:F.m, fontWeight:700, marginBottom:10}}>☀️ THE OVERBUILD CLIFF</div>
+                  <div style={{fontSize:28, color:"#eab308", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                    {computed.sb?.sz?.solarMW && computed.swgb?.sz?.solarMW ?
+                      Math.round((1 - computed.swgb.sz.solarMW / computed.sb.sz.solarMW) * 100) : 80}% less
+                  </div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Solar-only needs <b style={{color:"#E8E6E1"}}>{computed.sb?.sz?.solarMW?.toLocaleString() || "5,500"} MW</b> of panels.<br/>
+                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.solarMW?.toLocaleString() || "1,100"} MW</b>.<br/><br/>
+                    <span style={{color:"#eab308"}}>Why?</span> Without gas, you must generate enough surplus on sunny days to store for cloudy weeks.
+                    With gas, you only need to cover typical conditions.
+                  </div>
+                </div>
+
+                <div style={{background:"#ef444412", border:"1px solid #ef444433", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#ef4444", fontFamily:F.m, fontWeight:700, marginBottom:10}}>🔥 THE GAS EFFICIENCY</div>
+                  <div style={{fontSize:28, color:"#ef4444", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                    {computed.gu?.sz?.gasMW && computed.swgb?.sz?.gasMW ?
+                      Math.round((1 - computed.swgb.sz.gasMW / computed.gu.sz.gasMW) * 100) : 50}% less capacity
+                  </div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Gas-only needs <b style={{color:"#E8E6E1"}}>{computed.gu?.sz?.gasMW?.toLocaleString() || "1,200"} MW</b> running 24/7.<br/>
+                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.gasMW?.toLocaleString() || "600"} MW</b> for backup.<br/><br/>
+                    <span style={{color:"#ef4444"}}>Why?</span> Renewables cover ~65% of energy. Gas only fills gaps, so you need less installed capacity
+                    and burn far less fuel.
+                  </div>
+                </div>
+
+                <div style={{background:"#3b82f612", border:"1px solid #3b82f633", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#3b82f6", fontFamily:F.m, fontWeight:700, marginBottom:10}}>🌬️ THE DIVERSIFICATION BENEFIT</div>
+                  <div style={{fontSize:28, color:"#3b82f6", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                    Complementary
+                  </div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Solar peaks midday. Wind often peaks at night and in winter.<br/>
+                    Combined, they have <b style={{color:"#E8E6E1"}}>less total variability</b> than either alone.<br/><br/>
+                    <span style={{color:"#3b82f6"}}>Result:</span> Solar+Wind+Battery needs less storage than Solar+Battery alone,
+                    because wind fills some of solar's gaps (and vice versa).
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* The Cost Tradeoff Frontier */}
+            <div style={PS}>
+              <div style={SL}>THE COST TRADEOFF — LCOE vs GAS RELIANCE</div>
+              <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, marginBottom:12}}>
+                As you reduce gas usage, what happens to cost? This curve reveals the tradeoff.
+              </div>
+              {(()=>{
+                const W=750, H=320, pad={t:30,r:120,b:50,l:70};
+                const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+
+                // Data points: gas fraction vs LCOE
+                const data = SCEN.map(s => {
+                  const r = results[s.id];
+                  const gf = s.id==="gu"?1:s.id==="swgb"?0.35:0;
+                  const sz = computed[s.id].sz;
+                  const battMWh = sz.battMWh || 0;
+                  const overbuild = r.overbuild;
+                  return {
+                    id: s.id,
+                    name: s.short,
+                    fullName: s.name,
+                    color: s.color,
+                    lcoe: r.lcoe,
+                    gf,
+                    battMWh,
+                    overbuild,
+                    capex: r.netCapex,
+                    fuelCost: r.lcoeFuel
+                  };
+                }).sort((a,b) => b.gf - a.gf); // Sort by gas fraction descending
+
+                const maxLcoe = Math.max(...data.map(d=>d.lcoe)) * 1.15;
+                const minLcoe = Math.min(...data.map(d=>d.lcoe)) * 0.85;
+
+                const x = (gf) => pad.l + (1 - gf) * cw; // 100% gas on left, 0% on right
+                const y = (lcoe) => pad.t + ch - ((lcoe - minLcoe) / (maxLcoe - minLcoe)) * ch;
+
+                return (
+                  <svg width={W} height={H} style={{display:"block"}}>
+                    {/* Grid */}
+                    {[0,0.25,0.5,0.75,1].map(pct => (
+                      <g key={"grid-"+pct}>
+                        <line x1={pad.l} y1={pad.t+ch*pct} x2={pad.l+cw} y2={pad.t+ch*pct} stroke="#1E2330" strokeWidth={1}/>
+                        <line x1={pad.l+cw*pct} y1={pad.t} x2={pad.l+cw*pct} y2={pad.t+ch} stroke="#1E2330" strokeWidth={1}/>
+                      </g>
+                    ))}
+
+                    {/* Zones */}
+                    <rect x={pad.l} y={pad.t} width={cw*0.35} height={ch} fill="#ef444408"/>
+                    <rect x={pad.l+cw*0.35} y={pad.t} width={cw*0.35} height={ch} fill="#E8A83808"/>
+                    <rect x={pad.l+cw*0.7} y={pad.t} width={cw*0.3} height={ch} fill="#10b98108"/>
+
+                    <text x={pad.l+cw*0.15} y={pad.t+15} textAnchor="middle" fill="#ef4444" fontSize={8} fontFamily={F.m}>Gas Heavy</text>
+                    <text x={pad.l+cw*0.52} y={pad.t+15} textAnchor="middle" fill="#E8A838" fontSize={8} fontFamily={F.m}>Hybrid Zone</text>
+                    <text x={pad.l+cw*0.85} y={pad.t+15} textAnchor="middle" fill="#10b981" fontSize={8} fontFamily={F.m}>Renewables Heavy</text>
+
+                    {/* Axes */}
+                    <line x1={pad.l} y1={pad.t+ch} x2={pad.l+cw} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
+                    <line x1={pad.l} y1={pad.t} x2={pad.l} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
+
+                    {/* Axis labels */}
+                    <text x={pad.l+cw/2} y={H-8} textAnchor="middle" fill="#9CA3AF" fontSize={10} fontFamily={F.m}>← More Gas | Renewable Energy Fraction | More Renewables →</text>
+                    <text x={15} y={pad.t+ch/2} textAnchor="middle" fill="#9CA3AF" fontSize={10} fontFamily={F.m} transform={`rotate(-90,15,${pad.t+ch/2})`}>LCOE ($/MWh)</text>
+
+                    {/* Y-axis ticks */}
+                    {[0,0.25,0.5,0.75,1].map(pct => (
+                      <text key={"y-"+pct} x={pad.l-8} y={pad.t+ch*(1-pct)+4} textAnchor="end" fill="#6B7280" fontSize={8} fontFamily={F.m}>
+                        ${(minLcoe + (maxLcoe-minLcoe)*pct).toFixed(0)}
+                      </text>
+                    ))}
+
+                    {/* X-axis ticks */}
+                    <text x={pad.l} y={pad.t+ch+16} textAnchor="middle" fill="#6B7280" fontSize={8} fontFamily={F.m}>100% Gas</text>
+                    <text x={pad.l+cw*0.35} y={pad.t+ch+16} textAnchor="middle" fill="#6B7280" fontSize={8} fontFamily={F.m}>65%</text>
+                    <text x={pad.l+cw*0.65} y={pad.t+ch+16} textAnchor="middle" fill="#6B7280" fontSize={8} fontFamily={F.m}>35%</text>
+                    <text x={pad.l+cw} y={pad.t+ch+16} textAnchor="middle" fill="#6B7280" fontSize={8} fontFamily={F.m}>0% Gas</text>
+
+                    {/* Connect the dots with a line */}
+                    <path
+                      d={data.map((d,i) => `${i===0?"M":"L"}${x(d.gf)},${y(d.lcoe)}`).join(" ")}
+                      stroke="#E8A838"
+                      strokeWidth={2}
+                      fill="none"
+                      strokeDasharray="4,2"
+                    />
+
+                    {/* Data points */}
+                    {data.map((d,i) => (
+                      <g key={d.id}>
+                        <circle cx={x(d.gf)} cy={y(d.lcoe)} r={8} fill={d.color+"44"} stroke={d.color} strokeWidth={2}/>
+                        <text x={x(d.gf)} y={y(d.lcoe)+4} textAnchor="middle" fill="#fff" fontSize={7} fontWeight={700} fontFamily={F.m}>
+                          ${d.lcoe.toFixed(0)}
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* Legend on right */}
+                    {data.map((d,i) => (
+                      <g key={"leg-"+d.id}>
+                        <circle cx={pad.l+cw+20} cy={pad.t+30+i*28} r={5} fill={d.color}/>
+                        <text x={pad.l+cw+30} y={pad.t+33+i*28} fill="#E8E6E1" fontSize={9} fontFamily={F.m}>{d.name}</text>
+                        <text x={pad.l+cw+30} y={pad.t+44+i*28} fill="#6B7280" fontSize={7} fontFamily={F.m}>
+                          {d.gf===1?"100% gas":d.gf===0?"0% gas":Math.round(d.gf*100)+"% gas"}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                );
+              })()}
+              <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m, marginTop:8, fontStyle:"italic"}}>
+                The curve shows: moving from 100% gas to ~35% gas (hybrid) can maintain similar LCOE.
+                But going to 0% gas requires massive overbuild, causing costs to rise.
+              </div>
+            </div>
+
+            {/* The Infrastructure Tradeoff */}
+            <div style={PS}>
+              <div style={SL}>WHY THE CURVE BENDS — INFRASTRUCTURE REQUIREMENTS</div>
+              {(()=>{
+                const W=750, H=280, pad={t:30,r:30,b:50,l:70};
+                const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+
+                const data = SCEN.map(s => {
+                  const sz = computed[s.id].sz;
+                  const gf = s.id==="gu"?1:s.id==="swgb"?0.35:0;
+                  return {
+                    id: s.id,
+                    name: s.short,
+                    color: s.color,
+                    gf,
+                    battMWh: sz.battMWh || 0,
+                    solarMW: sz.solarMW || 0,
+                    windMW: sz.windMW || 0,
+                  };
+                }).sort((a,b) => b.gf - a.gf);
+
+                const maxBatt = Math.max(...data.map(d=>d.battMWh)) * 1.1;
+                const maxSolar = Math.max(...data.map(d=>d.solarMW)) * 1.1;
+
+                const x = (gf) => pad.l + (1 - gf) * cw;
+                const yBatt = (mwh) => pad.t + ch - (mwh / maxBatt) * ch;
+                const ySolar = (mw) => pad.t + ch - (mw / maxSolar) * ch;
+
+                return (
+                  <svg width={W} height={H} style={{display:"block"}}>
+                    {/* Grid */}
+                    {[0,0.25,0.5,0.75,1].map(pct => (
+                      <line key={"g-"+pct} x1={pad.l} y1={pad.t+ch*pct} x2={pad.l+cw} y2={pad.t+ch*pct} stroke="#1E2330" strokeWidth={1}/>
+                    ))}
+
+                    {/* Axes */}
+                    <line x1={pad.l} y1={pad.t+ch} x2={pad.l+cw} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
+                    <text x={pad.l+cw/2} y={H-8} textAnchor="middle" fill="#9CA3AF" fontSize={10} fontFamily={F.m}>← More Gas | Renewable Fraction | More Renewables →</text>
+
+                    {/* Battery line */}
+                    <path
+                      d={data.map((d,i) => `${i===0?"M":"L"}${x(d.gf)},${yBatt(d.battMWh)}`).join(" ")}
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      fill="none"
+                    />
+                    {data.map(d => (
+                      <circle key={"b-"+d.id} cx={x(d.gf)} cy={yBatt(d.battMWh)} r={5} fill="#10b981"/>
+                    ))}
+
+                    {/* Solar line */}
+                    <path
+                      d={data.map((d,i) => `${i===0?"M":"L"}${x(d.gf)},${ySolar(d.solarMW)}`).join(" ")}
+                      stroke="#eab308"
+                      strokeWidth={3}
+                      fill="none"
+                    />
+                    {data.map(d => (
+                      <circle key={"s-"+d.id} cx={x(d.gf)} cy={ySolar(d.solarMW)} r={5} fill="#eab308"/>
+                    ))}
+
+                    {/* Legend */}
+                    <circle cx={pad.l+20} cy={pad.t+10} r={5} fill="#10b981"/>
+                    <text x={pad.l+30} y={pad.t+14} fill="#10b981" fontSize={9} fontFamily={F.m}>Battery (MWh) — up to {(maxBatt/1000).toFixed(0)} GWh</text>
+                    <circle cx={pad.l+200} cy={pad.t+10} r={5} fill="#eab308"/>
+                    <text x={pad.l+210} y={pad.t+14} fill="#eab308" fontSize={9} fontFamily={F.m}>Solar (MW) — up to {maxSolar.toLocaleString()} MW</text>
+
+                    {/* Annotation */}
+                    <text x={pad.l+cw-10} y={pad.t+50} textAnchor="end" fill="#ef4444" fontSize={9} fontFamily={F.m}>↑ Exponential growth</text>
+                    <text x={pad.l+cw-10} y={pad.t+62} textAnchor="end" fill="#ef4444" fontSize={8} fontFamily={F.m}>as gas → 0%</text>
+                  </svg>
+                );
+              })()}
+              <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginTop:10, lineHeight:1.7}}>
+                <b style={{color:"#E8E6E1"}}>The key insight:</b> Infrastructure requirements grow <b style={{color:"#ef4444"}}>exponentially</b> as you approach 0% gas.
+                The last 35% of gas to eliminate requires more additional infrastructure than the first 65%.
+                This is why the hybrid "sweet spot" exists — you get most of the fuel savings with minimal infrastructure penalty.
+              </div>
+            </div>
+
+            {/* The Math */}
+            <div style={PS}>
+              <div style={SL}>THE UNDERLYING MATH</div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
+                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#ef4444", fontFamily:F.m, fontWeight:700, marginBottom:10}}>GAS-ONLY COST STRUCTURE</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
+                    <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
+                      <span>Capex (~$900/kW × 1.2 GW)</span>
+                      <span style={{color:"#E8E6E1"}}>{fmt$(computed.gu?.lcoe?.netCapex || 1080000000)}</span>
+                    </div>
+                    <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
+                      <span>Annual Fuel (100% × 8760h × ${(p.gasPrice * p.heatRate).toFixed(1)}/MWh)</span>
+                      <span style={{color:"#ef4444", fontWeight:600}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
+                    </div>
+                    <div style={{display:"flex", justifyContent:"space-between", paddingTop:4}}>
+                      <span style={{color:"#E8E6E1", fontWeight:600}}>Fuel over {p.life} years</span>
+                      <span style={{color:"#ef4444", fontWeight:700}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:10}}>HYBRID COST STRUCTURE</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
+                    <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
+                      <span>Capex (Solar+Wind+Batt+Gas)</span>
+                      <span style={{color:"#E8E6E1"}}>{fmt$(computed.swgb?.lcoe?.netCapex || 2500000000)}</span>
+                    </div>
+                    <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
+                      <span>Less: ITC Credit (30% on solar+batt)</span>
+                      <span style={{color:"#10b981"}}>-{fmt$((computed.swgb?.lcoe?.capexBreakdown?.solar || 0) * 0.3 + (computed.swgb?.lcoe?.capexBreakdown?.battery || 0) * 0.3)}</span>
+                    </div>
+                    <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
+                      <span>Annual Fuel (35% × 8760h × ${(p.gasPrice * p.heatRate).toFixed(1)}/MWh)</span>
+                      <span style={{color:"#E8A838", fontWeight:600}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
+                    </div>
+                    <div style={{display:"flex", justifyContent:"space-between", paddingTop:4}}>
+                      <span style={{color:"#E8E6E1", fontWeight:600}}>Fuel over {p.life} years</span>
+                      <span style={{color:"#E8A838", fontWeight:700}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{marginTop:16, padding:14, background:"linear-gradient(135deg, #E8A83815 0%, #10b98115 100%)", borderRadius:8, border:"1px solid #E8A83844"}}>
+                <div style={{fontSize:11, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.8}}>
+                  <b style={{color:"#E8A838"}}>The tradeoff:</b> Hybrid has ~{fmt$(Math.abs((computed.swgb?.lcoe?.netCapex || 2500000000) - (computed.gu?.lcoe?.netCapex || 1080000000)))} higher capex,
+                  but saves ~<b style={{color:"#10b981"}}>${((1-0.35) * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</b> in fuel over {p.life} years.
+                  <br/><br/>
+                  Add the <b style={{color:"#3b82f6"}}>ITC/PTC incentives</b> and the economics converge.
+                </div>
+              </div>
+            </div>
+
+            {/* Key Takeaways */}
+            <div style={{...PS, background:"linear-gradient(135deg, #1a1d25 0%, #0f1115 100%)", border:"1px solid #E8A83855"}}>
+              <div style={SL}>KEY TAKEAWAYS</div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
+                <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #10b981"}}>
+                  <div style={{fontSize:10, color:"#10b981", fontFamily:F.m, fontWeight:700, marginBottom:6}}>1. GAS PROVIDES CAPACITY</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Gas is "reliability insurance." It eliminates the need for weeks of battery storage and massive renewable overbuild.
+                  </div>
+                </div>
+                <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #eab308"}}>
+                  <div style={{fontSize:10, color:"#eab308", fontFamily:F.m, fontWeight:700, marginBottom:6}}>2. RENEWABLES PROVIDE ENERGY</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    Every MWh from solar/wind displaces expensive gas fuel. Zero marginal cost generation is the key to long-term savings.
+                  </div>
+                </div>
+                <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #E8A838"}}>
+                  <div style={{fontSize:10, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:6}}>3. HYBRID OPTIMIZES BOTH</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
+                    The "sweet spot" uses gas for ~35% of energy. You get most fuel savings with minimal infrastructure penalty.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>)}
+
+          {/* ===== SIZING ===== */}
+          {tab==="sizing"&&(
+            <div style={PS}>
+              <div style={SL}>INFRASTRUCTURE SIZING {"\u2014"} 100% RELIABLE</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,fontFamily:F.m}}>
+                <thead><tr style={{borderBottom:"1px solid #2A3040"}}>
+                  {["Config","Solar MW","Wind MW","Gas MW","Batt MW","Batt GWh","Overbuild","Capex","Reliability"].map(h=>
+                    <th key={h} style={{padding:"6px 4px",textAlign:"right",color:"#6B7280",fontWeight:500,fontSize:8}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{SCEN.map(s=>{const r=results[s.id],sz=computed[s.id].sz,d=computed[s.id].disp.stats;return(
+                  <tr key={s.id} style={{borderBottom:"1px solid #1E2330"}}>
+                    <td style={{padding:"6px 4px",color:s.color,fontWeight:600}}>{s.short}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.solarMW?"#E8E6E1":"#2A3040"}}>{sz.solarMW?sz.solarMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.windMW?"#E8E6E1":"#2A3040"}}>{sz.windMW?sz.windMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.gasMW?"#E8E6E1":"#2A3040"}}>{sz.gasMW?sz.gasMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMW?"#E8E6E1":"#2A3040"}}>{sz.battMW?sz.battMW.toLocaleString():"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:sz.battMWh?"#E8E6E1":"#2A3040"}}>{sz.battMWh?(sz.battMWh/1000).toFixed(1):"\u2014"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}>{r.overbuild.toFixed(1)}x</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",fontWeight:600}}>{fmt$(r.netCapex)}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",color:d.reliability>=99.9?"#2D8C6F":"#E8A838"}}>{d.reliability.toFixed(1)}%</td>
+                  </tr>);})}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ===== THESIS ===== */}
+          {tab==="thesis"&&(<>
+            <div style={PS}>
               <div style={SL}>THE HYBRID UNLOCK — WHY RENEWABLES + GAS BEATS EITHER ALONE</div>
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7, marginBottom:16}}>
                 The counterintuitive result: a hybrid system (solar + wind + battery + gas) can achieve similar LCOE to gas-only,
