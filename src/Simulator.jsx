@@ -830,6 +830,12 @@ export default function App() {
     return o;
   });
 
+  // Correlation tab state
+  const [corrWindPeak, setCorrWindPeak] = useState(53);
+  const [corrSolarPeak, setCorrSolarPeak] = useState(25);
+  const [corrWindMW, setCorrWindMW] = useState(500);
+  const [corrSolarMW, setCorrSolarMW] = useState(500);
+
   // Compute scenario LCOE for a given config at a given blend level or with overrides
   const scenarioResults = useMemo(() => {
     const out = {};
