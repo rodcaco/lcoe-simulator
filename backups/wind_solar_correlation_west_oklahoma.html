@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wind-Solar Diurnal Correlation — Western Oklahoma</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fafaf8; color: #1a1a1a; padding: 2rem; max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #888; margin-bottom: 2rem; }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric { background: #f0efea; border-radius: 8px; padding: 1rem; }
+  .metric-label { font-size: 12px; color: #888; }
+  .metric-value { font-size: 22px; font-weight: 500; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 1.5rem; }
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .control-row label { font-size: 13px; color: #888; min-width: 90px; }
+  .control-row input[type=range] { flex: 1; }
+  .control-row span { font-size: 13px; font-weight: 500; min-width: 48px; }
+  .section-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #888; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .chart-wrap { position: relative; width: 100%; height: 300px; }
+  .chart-wrap.short { height: 260px; }
+  .section { margin-top: 2rem; }
+  .bottom-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Wind + solar diurnal correlation</h1>
+<p class="subtitle">Western Oklahoma / panhandle corridor — yearly-averaged hourly profiles</p>
+
+<div class="metrics">
+  <div class="metric"><div class="metric-label">Pearson r</div><div class="metric-value" id="corr-val">—</div></div>
+  <div class="metric"><div class="metric-label">Wind avg CF</div><div class="metric-value" id="wind-avg">—</div></div>
+  <div class="metric"><div class="metric-label">Solar avg CF</div><div class="metric-value" id="solar-avg">—</div></div>
+  <div class="metric"><div class="metric-label">Blended CF</div><div class="metric-value" id="blend-avg">—</div></div>
+</div>
+
+<div class="controls">
+  <div>
+    <div class="control-row">
+      <label>Wind peak CF</label>
+      <input type="range" min="40" max="65" value="53" step="1" id="wind-peak" />
+      <span id="wind-peak-out">53%</span>
+    </div>
+    <div class="control-row">
+      <label>Solar peak CF</label>
+      <input type="range" min="15" max="35" value="25" step="1" id="solar-peak" />
+      <span id="solar-peak-out">25%</span>
+    </div>
+  </div>
+  <div>
+    <div class="control-row">
+      <label>Wind MW</label>
+      <input type="range" min="100" max="2000" value="500" step="50" id="wind-mw" />
+      <span id="wind-mw-out">500 MW</span>
+    </div>
+    <div class="control-row">
+      <label>Solar MW</label>
+      <input type="range" min="0" max="2000" value="500" step="50" id="solar-mw" />
+      <span id="solar-mw-out">500 MW</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Total MW output by hour (additive)</div>
+<div class="legend">
+  <span class="legend-item"><span class="legend-swatch" style="background:#3266ad;"></span>Wind output</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:#BA7517;"></span>Solar output</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:#639922;"></span>Combined total</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:#E24B4A;"></span>DC load</span>
+</div>
+<div class="chart-wrap"><canvas id="mwChart"></canvas></div>
+
+<div class="section">
+  <div class="section-title">Capacity factor view (blended)</div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:#3266ad;"></span>Wind CF</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#BA7517;"></span>Solar CF</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#534AB7;"></span>Blended CF (weighted)</span>
+  </div>
+  <div class="chart-wrap short"><canvas id="cfChart"></canvas></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Hourly surplus / deficit vs DC load</div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:#639922;"></span>Surplus (curtail / store)</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#E24B4A;"></span>Deficit (need gas / grid)</span>
+  </div>
+  <div class="chart-wrap short"><canvas id="deltaChart"></canvas></div>
+  <div class="bottom-metrics">
+    <div class="metric"><div class="metric-label">Avg surplus</div><div class="metric-value" id="avg-surplus">—</div></div>
+    <div class="metric"><div class="metric-label">Avg deficit</div><div class="metric-value" id="avg-deficit">—</div></div>
+    <div class="metric"><div class="metric-label">Hours in deficit</div><div class="metric-value" id="deficit-hours">—</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Scatter: wind vs solar CF by hour</div>
+  <div class="chart-wrap short"><canvas id="scatterChart"></canvas></div>
+</div>
+
+<script>
+const hours = Array.from({length: 24}, (_, i) => i);
+const labels = hours.map(h => `${h}:00`);
+
+function windCFProfile(peakPct) {
+  const shape = [0.82,0.85,0.87,0.88,0.86,0.83,0.76,0.67,0.58,0.51,0.46,0.43,0.42,0.43,0.46,0.50,0.55,0.62,0.70,0.76,0.80,0.82,0.82,0.82];
+  const avg = shape.reduce((a,b) => a+b, 0) / shape.length;
+  return shape.map(s => (s / avg) * (peakPct / 100) * avg);
+}
+
+function solarCFProfile(peakPct) {
+  return hours.map(h => {
+    if (h < 6 || h > 20) return 0;
+    const x = (h - 13) / 4.5;
+    return (peakPct / 100) * Math.exp(-0.5 * x * x);
+  });
+}
+
+function pearson(x, y) {
+  const n = x.length;
+  const mx = x.reduce((a,b) => a+b, 0) / n;
+  const my = y.reduce((a,b) => a+b, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = x[i] - mx, dy = y[i] - my;
+    num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  return dy2 === 0 ? 0 : num / Math.sqrt(dx2 * dy2);
+}
+
+const gc = 'rgba(0,0,0,0.06)';
+const tc = 'rgba(0,0,0,0.5)';
+const xOpts = { grid: { color: gc }, ticks: { color: tc, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } };
+
+const mwChart = new Chart(document.getElementById('mwChart'), {
+  type: 'line',
+  data: { labels, datasets: [
+    { label: 'Wind', data: [], borderColor: '#3266ad', backgroundColor: 'rgba(50,102,173,0.15)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2, order: 3 },
+    { label: 'Solar', data: [], borderColor: '#BA7517', backgroundColor: 'rgba(186,117,23,0.15)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2, order: 2 },
+    { label: 'Combined', data: [], borderColor: '#639922', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2.5, order: 1 },
+    { label: 'DC Load', data: [], borderColor: '#E24B4A', borderDash: [8, 4], fill: false, tension: 0, pointRadius: 0, borderWidth: 2, order: 0 }
+  ]},
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)} MW` } } },
+    scales: { x: xOpts, y: { min: 0, grid: { color: gc }, ticks: { color: tc }, title: { display: true, text: 'MW output', color: tc, font: { size: 12 } } } }
+  }
+});
+
+const cfChart = new Chart(document.getElementById('cfChart'), {
+  type: 'line',
+  data: { labels, datasets: [
+    { label: 'Wind CF', data: [], borderColor: '#3266ad', fill: false, tension: 0.4, pointRadius: 2, borderWidth: 2 },
+    { label: 'Solar CF', data: [], borderColor: '#BA7517', fill: false, tension: 0.4, pointRadius: 2, borderWidth: 2 },
+    { label: 'Blended CF', data: [], borderColor: '#534AB7', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2.5, borderDash: [6, 3] }
+  ]},
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${(ctx.parsed.y * 100).toFixed(1)}%` } } },
+    scales: { x: xOpts, y: { min: 0, max: 0.7, grid: { color: gc }, ticks: { color: tc, callback: v => Math.round(v * 100) + '%' }, title: { display: true, text: 'Capacity factor', color: tc, font: { size: 12 } } } }
+  }
+});
+
+const deltaChart = new Chart(document.getElementById('deltaChart'), {
+  type: 'bar',
+  data: { labels, datasets: [
+    { label: 'Surplus', data: [], backgroundColor: 'rgba(99,153,34,0.6)', borderColor: '#639922', borderWidth: 1 },
+    { label: 'Deficit', data: [], backgroundColor: 'rgba(226,75,74,0.6)', borderColor: '#E24B4A', borderWidth: 1 }
+  ]},
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.round(Math.abs(ctx.parsed.y))} MW` } } },
+    scales: { x: { ...xOpts, stacked: true }, y: { stacked: true, grid: { color: gc }, ticks: { color: tc }, title: { display: true, text: 'MW vs load', color: tc, font: { size: 12 } } } }
+  }
+});
+
+const scatterChart = new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: { datasets: [{ data: [], backgroundColor: 'rgba(83,74,183,0.5)', borderColor: '#534AB7', borderWidth: 1, pointRadius: 6 }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Wind: ${(ctx.parsed.x * 100).toFixed(1)}%, Solar: ${(ctx.parsed.y * 100).toFixed(1)}%` } } },
+    scales: {
+      x: { min: 0, max: 0.7, grid: { color: gc }, ticks: { color: tc, callback: v => Math.round(v * 100) + '%' }, title: { display: true, text: 'Wind CF', color: tc, font: { size: 12 } } },
+      y: { min: 0, max: 0.35, grid: { color: gc }, ticks: { color: tc, callback: v => Math.round(v * 100) + '%' }, title: { display: true, text: 'Solar CF', color: tc, font: { size: 12 } } }
+    }
+  }
+});
+
+function update() {
+  const wp = parseInt(document.getElementById('wind-peak').value);
+  const sp = parseInt(document.getElementById('solar-peak').value);
+  const wMW = parseInt(document.getElementById('wind-mw').value);
+  const sMW = parseInt(document.getElementById('solar-mw').value);
+  document.getElementById('wind-peak-out').textContent = wp + '%';
+  document.getElementById('solar-peak-out').textContent = sp + '%';
+  document.getElementById('wind-mw-out').textContent = wMW + ' MW';
+  document.getElementById('solar-mw-out').textContent = sMW + ' MW';
+
+  const wCF = windCFProfile(wp);
+  const sCF = solarCFProfile(sp);
+  const totalNP = wMW + sMW;
+  const blendedCF = hours.map((_, i) => totalNP > 0 ? (wCF[i] * wMW + sCF[i] * sMW) / totalNP : 0);
+  const wOut = wCF.map(c => c * wMW);
+  const sOut = sCF.map(c => c * sMW);
+  const combined = wOut.map((w, i) => w + sOut[i]);
+  const dcLoad = totalNP * 0.4;
+
+  const r = pearson(wCF, sCF);
+  const wAvg = wCF.reduce((a,b) => a+b, 0) / 24;
+  const sAvg = sCF.reduce((a,b) => a+b, 0) / 24;
+  const bAvg = blendedCF.reduce((a,b) => a+b, 0) / 24;
+
+  document.getElementById('corr-val').textContent = r.toFixed(3);
+  document.getElementById('wind-avg').textContent = (wAvg * 100).toFixed(1) + '%';
+  document.getElementById('solar-avg').textContent = (sAvg * 100).toFixed(1) + '%';
+  document.getElementById('blend-avg').textContent = (bAvg * 100).toFixed(1) + '%';
+
+  mwChart.data.datasets[0].data = wOut;
+  mwChart.data.datasets[1].data = sOut;
+  mwChart.data.datasets[2].data = combined;
+  mwChart.data.datasets[3].data = Array(24).fill(dcLoad);
+  mwChart.update('none');
+
+  cfChart.data.datasets[0].data = wCF;
+  cfChart.data.datasets[1].data = sCF;
+  cfChart.data.datasets[2].data = blendedCF;
+  cfChart.update('none');
+
+  const surplus = combined.map(c => Math.max(0, c - dcLoad));
+  const deficit = combined.map(c => Math.min(0, c - dcLoad));
+  deltaChart.data.datasets[0].data = surplus;
+  deltaChart.data.datasets[1].data = deficit;
+  deltaChart.update('none');
+
+  const surplusHrs = surplus.filter(s => s > 0);
+  const surplusAvg = surplusHrs.length > 0 ? surplusHrs.reduce((a,b) => a+b, 0) / surplusHrs.length : 0;
+  const deficitHrs = deficit.filter(d => d < 0);
+  const defAvg = deficitHrs.length > 0 ? Math.abs(deficitHrs.reduce((a,b) => a+b, 0) / deficitHrs.length) : 0;
+
+  document.getElementById('avg-surplus').textContent = Math.round(surplusAvg) + ' MW';
+  document.getElementById('avg-deficit').textContent = Math.round(defAvg) + ' MW';
+  document.getElementById('deficit-hours').textContent = deficitHrs.length + ' / 24';
+
+  scatterChart.data.datasets[0].data = hours.map(i => ({ x: wCF[i], y: sCF[i] }));
+  scatterChart.update('none');
+}
+
+['wind-peak','solar-peak','wind-mw','solar-mw'].forEach(id => {
+  document.getElementById(id).addEventListener('input', update);
+});
+update();
+</script>
+
+<div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #ddd;">
+  <h2 style="font-size: 16px; font-weight: 500; margin-bottom: 1rem;">Methodology & assumptions</h2>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 1rem;">
+    This tool models <strong>yearly-averaged hourly</strong> capacity factor profiles for wind and solar resources in the western Oklahoma / panhandle corridor. Profiles are synthetic approximations calibrated to published empirical data — they are not raw hourly timeseries from any single year or site. Users should treat outputs as directional for portfolio sizing and complementarity analysis, not as bankable energy yield estimates.
+  </p>
+
+  <h3 style="font-size: 14px; font-weight: 500; margin-top: 1.5rem; margin-bottom: 0.5rem;">Wind diurnal profile</h3>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    The 24-hour wind shape vector is derived from the diurnal pattern characteristic of the U.S. Southern Great Plains low-level jet (LLJ), where hub-height winds peak overnight (~22:00–04:00 CST) and trough midday (~12:00–15:00 CST). This pattern is well-documented across the Oklahoma panhandle, West Texas, and western Kansas corridors. The shape is normalized and then scaled to the user-selected peak capacity factor.
+  </p>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    Default peak CF of 53% is based on the DOE Plains & Eastern Clean Line levelized cost analysis assumption for Oklahoma panhandle wind resources.<sup>1</sup> The 30–45% statewide range reflects fleet-wide averages inclusive of older, shorter turbines.<sup>2</sup> Modern turbines at 140m+ hub heights in the panhandle corridor can achieve 48–55% net CF.<sup>3</sup>
+  </p>
+
+  <h3 style="font-size: 14px; font-weight: 500; margin-top: 1.5rem; margin-bottom: 0.5rem;">Solar diurnal profile</h3>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    Solar CF is modeled as a Gaussian curve centered at 13:00 CST (accounting for Oklahoma's position within the Central time zone) with a standard deviation of 4.5 hours, truncated to zero before 06:00 and after 20:00. This approximates the yearly-averaged diurnal solar irradiance envelope for a fixed-tilt utility-scale PV system at ~36.5°N latitude.
+  </p>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    Default peak CF of 25% reflects western Oklahoma GHI of ~5.0–5.5 kWh/m²/day,<sup>4</sup> yielding annual CFs in the 22–26% range for fixed-tilt PV. Single-axis tracking would increase this to ~27–32%.
+  </p>
+
+  <h3 style="font-size: 14px; font-weight: 500; margin-top: 1.5rem; margin-bottom: 0.5rem;">Correlation methodology</h3>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    Pearson correlation coefficient (r) is computed across the 24 hourly wind and solar CF values. This captures the <em>average diurnal</em> complementarity only. Actual hourly correlations on any given day will vary significantly due to weather — frontal systems, cloud cover, and wind drought events can produce positive correlations (both resources low simultaneously). Published research shows hourly wind-solar correlations are weakest (near zero or weakly negative), while monthly/seasonal correlations are more strongly negative.<sup>5, 6</sup>
+  </p>
+
+  <h3 style="font-size: 14px; font-weight: 500; margin-top: 1.5rem; margin-bottom: 0.5rem;">DC load assumption</h3>
+  <p style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 0.5rem;">
+    The DC load line is set at 40% of total combined nameplate capacity (wind + solar). This is a rough proxy representing a flat 24/7 data center load sized to approximately match annual energy production from the renewable portfolio. In practice, DC loads are constant (not time-varying), and actual load sizing would be determined by interconnection capacity, not renewable nameplate.
+  </p>
+
+  <h3 style="font-size: 14px; font-weight: 500; margin-top: 1.5rem; margin-bottom: 0.5rem;">Key limitations</h3>
+  <ul style="font-size: 13px; color: #555; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem;">
+    <li>Profiles are yearly averages — seasonal variation (stronger wind in spring, weaker in summer; stronger solar in summer) is smoothed out</li>
+    <li>Multi-day wind/solar drought events (3–7+ day calm/cloudy periods) are not represented in averaged profiles</li>
+    <li>No curtailment, transmission constraints, or wake losses modeled</li>
+    <li>No battery storage or gas backup dispatch modeled</li>
+    <li>Solar profile assumes fixed-tilt; single-axis tracking would widen and flatten the curve</li>
+    <li>Wind profile does not account for site-specific terrain, turbine model power curves, or interannual variability</li>
+  </ul>
+
+  <h2 style="font-size: 16px; font-weight: 500; margin-top: 2rem; margin-bottom: 1rem;">Sources & databases</h2>
+  <ol style="font-size: 12px; color: #666; line-height: 1.8; padding-left: 1.5rem;">
+    <li>
+      <strong>U.S. Department of Energy</strong>, Plains & Eastern Clean Line Levelized Cost Analysis, Appendix 6-B (2015). Oklahoma panhandle wind CF assumption of 53%.
+      <br><a href="https://www.energy.gov/sites/default/files/2015/04/f22/CleanLinePt2-Appendix-6-B.pdf" style="color:#3266ad;">energy.gov — Plains & Eastern Appendix 6-B</a>
+    </li>
+    <li>
+      <strong>Oklahoma Historical Society</strong>, "Wind Energy," Encyclopedia of Oklahoma History and Culture (2019). Statewide CF range of 30–45%.
+      <br><a href="https://www.okhistory.org/publications/enc/entry?entry=WI085" style="color:#3266ad;">okhistory.org — Wind Energy</a>
+    </li>
+    <li>
+      <strong>U.S. DOE / Lawrence Berkeley National Laboratory</strong>, Land-Based Wind Market Report: 2024 Edition. National fleet-wide CF of 33.5% (2023); plants built in 2022 achieving 38.2%.
+      <br><a href="https://www.energy.gov/cmei/systems/land-based-wind-market-report-2024-edition" style="color:#3266ad;">energy.gov — Wind Market Report 2024</a>
+    </li>
+    <li>
+      <strong>NREL National Solar Radiation Database (NSRDB)</strong>, PSM v3. GHI data for Oklahoma (~4.7–5.5 kWh/m²/day west-to-east gradient).
+      <br><a href="https://nsrdb.nrel.gov/" style="color:#3266ad;">nsrdb.nrel.gov</a>
+    </li>
+    <li>
+      <strong>Monforti-Ferrario et al.</strong> (2017), "Local complementarity of wind and solar energy resources over Europe," <em>J. Applied Meteorology and Climatology</em>, 56(1). Hourly wind-solar correlation methodology.
+      <br><a href="https://journals.ametsoc.org/view/journals/apme/56/1/jamc-d-16-0031.1.xml" style="color:#3266ad;">AMS Journals — Monforti-Ferrario 2017</a>
+    </li>
+    <li>
+      <strong>Jurasz et al.</strong> (2021), "Complementarity and 'Resource Droughts' of Solar and Wind Energy in Poland," <em>Energies</em>, 14(4), 1118. Temporal complementarity across hourly/daily/monthly timescales.
+      <br><a href="https://www.mdpi.com/1996-1073/14/4/1118" style="color:#3266ad;">MDPI Energies — Jurasz 2021</a>
+    </li>
+    <li>
+      <strong>Rhodes et al.</strong> (2018), "Assessing solar and wind complementarity in Texas," <em>Sustainable Energy Research</em>, 5(1). Diurnal wind-solar profiles and Pearson correlations for West Texas and South Texas sites using NREL SAM + WIND Toolkit + NSRDB data (2007–2013).
+      <br><a href="https://sustainenergyres.springeropen.com/articles/10.1186/s40807-018-0054-3" style="color:#3266ad;">Springer — Rhodes 2018</a>
+    </li>
+    <li>
+      <strong>NREL Wind Integration National Dataset (WIND) Toolkit</strong>. Hourly wind speed and modeled power output at 126,000+ sites across the continental U.S. at 5-minute resolution (2007–2013). Primary reference for Great Plains diurnal wind shape calibration.
+      <br><a href="https://www.nrel.gov/grid/wind-toolkit.html" style="color:#3266ad;">nrel.gov — WIND Toolkit</a>
+    </li>
+    <li>
+      <strong>U.S. EIA</strong>, "U.S. wind generation falls into regional patterns by season" (2022). Lower Plains (TX, OK, KS, NM) seasonal capacity factor patterns and 44% share of national wind capacity.
+      <br><a href="https://www.eia.gov/todayinenergy/detail.php?id=54819" style="color:#3266ad;">eia.gov — Regional wind patterns</a>
+    </li>
+    <li>
+      <strong>S&P Global Market Intelligence</strong>, "Over 16 GW of planned wind capacity in SPP supported by robust financial outlook" (2024). Oklahoma fleet-average wind CF of 41%; state ranking 4th nationally.
+      <br><a href="https://www.spglobal.com/market-intelligence/en/news-insights/research/over-16-gw-of-planned-wind-capacity-in-spp-supported-by-robust-financial-outlook" style="color:#3266ad;">S&P Global — SPP Wind Outlook</a>
+    </li>
+    <li>
+      <strong>Lazard</strong>, Levelized Cost of Energy+ (LCOE+), v17/v18 (2024). Onshore wind + storage LCOE: $45–133/MWh; standalone onshore wind: $27–73/MWh.
+      <br><a href="https://www.lazard.com/research-insights/levelized-cost-of-energyplus/" style="color:#3266ad;">lazard.com — LCOE+</a>
+    </li>
+    <li>
+      <strong>Windpower Monthly</strong>, "Gaining a better understanding of capacity factor, productivity and efficiency" (2013). Relationship between specific rating (W/m²), rated wind speed, full-load hours, and capacity factor at varying mean wind speeds.
+      <br><a href="https://www.windpowermonthly.com/article/1163492" style="color:#3266ad;">windpowermonthly.com</a>
+    </li>
+  </ol>
+
+  <p style="font-size: 11px; color: #999; margin-top: 1.5rem; line-height: 1.6;">
+    Prepared April 2026 · Deca internal use only · Profiles are synthetic approximations, not site-specific energy yield assessments. For bankable estimates, use hourly timeseries from NREL WIND Toolkit / NSRDB with site-specific turbine power curves and NREL PVWatts / System Advisor Model (SAM).
+  </p>
+</div>
+
+</body>
+</html>

@@ -361,7 +361,7 @@ function GasPresetPanel({gasPreset, setGasPreset, gasConfig, gasMetrics}) {
       <div style={{background:"rgba(0,0,0,0.2)",borderRadius:4,padding:8}}>
         <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Selected Config Details</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:9,fontFamily:F.m}}>
-          <div><span style={{color:"#6B7280"}}>Heat Rate:</span> <span style={{color:"#E8A838"}}>{gasConfig.weightedHR} MMBtu/MWh</span></div>
+          <div><span style={{color:"#6B7280"}}>Heat Rate:</span> <span style={{color:"#C9B896"}}>{gasConfig.weightedHR} MMBtu/MWh</span></div>
           <div><span style={{color:"#6B7280"}}>Startup:</span> <span style={{color:"#2D8C6F"}}>{gasConfig.avgStartup} min</span></div>
           <div><span style={{color:"#6B7280"}}>CapEx:</span> <span style={{color:"#9CA3AF"}}>from slider</span></div>
           <div><span style={{color:"#6B7280"}}>Capacity:</span> <span style={{color:"#E8E6E1"}}>{gasConfig.totalMW} MW</span></div>
@@ -1087,7 +1087,7 @@ export default function App() {
                   );
                 })}
                 <button onClick={()=>setPhases(prev=>[...prev,{year:(prev[prev.length-1]?.year||0)+2,label:`Phase ${prev.length+1}`,gasMW:0,solarMW:500,windMW:500,battMW:200,battMWh:800}])}
-                  style={{marginTop:4,padding:"4px 12px",fontSize:9,fontFamily:F.m,background:"#1E2330",color:"#9CA3AF",border:"1px solid #2A3040",borderRadius:3,cursor:"pointer"}}>+ ADD PHASE</button>
+                  style={{marginTop:4,padding:"4px 12px",fontSize:9,fontFamily:F.m,background:"#1E2330",color:"#9CA3AF",border:"1px solid #1E2330",borderRadius:3,cursor:"pointer"}}>+ ADD PHASE</button>
               </div>
 
               {/* Insight */}
@@ -1534,7 +1534,7 @@ export default function App() {
               <div style={SL}>THE HYBRID ADVANTAGE — A DEEPER LOOK</div>
               <div style={{fontSize:11, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.8, marginBottom:12}}>
                 Why can a hybrid system (solar + wind + battery + gas) match or beat gas-only LCOE despite needing more types of equipment?
-                The answer lies in <b style={{color:"#E8A838"}}>what each technology contributes</b> and <b style={{color:"#E8A838"}}>what it eliminates</b>.
+                The answer lies in <b style={{color:"#C9B896"}}>what each technology contributes</b> and <b style={{color:"#C9B896"}}>what it eliminates</b>.
               </div>
             </div>
 
@@ -1543,12 +1543,12 @@ export default function App() {
               <div style={SL}>INFRASTRUCTURE REQUIREMENTS — THE NUMBERS THAT MATTER</div>
               <table style={{width:"100%", borderCollapse:"collapse", fontSize:10, fontFamily:F.m, marginBottom:12}}>
                 <thead>
-                  <tr style={{borderBottom:"2px solid #2A3040", background:"#1a1d25"}}>
+                  <tr style={{borderBottom:"2px solid #2A3040", background:"#12151C"}}>
                     <th style={{padding:"10px 6px", textAlign:"left", color:"#9CA3AF", fontSize:9}}>Configuration</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#B8A060", fontSize:9}}>Solar MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#7090B8", fontSize:9}}>Wind MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#B85C5C", fontSize:9}}>Gas MW</th>
-                    <th style={{padding:"10px 6px", textAlign:"right", color:"#6B9080", fontSize:9}}>Battery MWh</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Solar MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Wind MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Gas MW</th>
+                    <th style={{padding:"10px 6px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Battery MWh</th>
                     <th style={{padding:"10px 6px", textAlign:"right", color:"#a78bfa", fontSize:9}}>Overbuild</th>
                     <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9}}>Net Capex</th>
                     <th style={{padding:"10px 6px", textAlign:"right", color:"#E8E6E1", fontSize:9, fontWeight:700}}>LCOE</th>
@@ -1578,60 +1578,56 @@ export default function App() {
             {/* Key Observations from the Table */}
             <div style={PS}>
               <div style={SL}>WHAT THE TABLE REVEALS</div>
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
 
-                <div style={{background:"#1a1d25", border:"1px solid #2A3040", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#6B9080", fontFamily:F.m, fontWeight:700, marginBottom:10}}>THE BATTERY CLIFF</div>
-                  <div style={{fontSize:28, color:"#6B9080", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:16}}>
+                  <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.5px"}}>Battery Storage</div>
+                  <div style={{fontSize:22, color:"#E8E6E1", fontFamily:F.m, fontWeight:700, marginBottom:8}}>
                     {computed.sb?.sz?.battMWh && computed.swgb?.sz?.battMWh ?
-                      Math.round((1 - computed.swgb.sz.battMWh / computed.sb.sz.battMWh) * 100) : 94}% less
+                      Math.round((1 - computed.swgb.sz.battMWh / computed.sb.sz.battMWh) * 100) : 94}% reduction
                   </div>
-                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
-                    Solar+Battery needs <b style={{color:"#E8E6E1"}}>{computed.sb?.sz?.battMWh?.toLocaleString() || "23,000"} MWh</b> of storage.<br/>
-                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.battMWh?.toLocaleString() || "1,400"} MWh</b>.<br/><br/>
-                    <span style={{color:"#6B9080"}}>Why?</span> Without gas, you need batteries to cover multi-day weather events.
-                    With gas backup, you only need 4 hours for daily solar shifting.
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    Solar+Battery requires {computed.sb?.sz?.battMWh?.toLocaleString() || "23,000"} MWh.
+                    Hybrid requires only {computed.swgb?.sz?.battMWh?.toLocaleString() || "1,400"} MWh.
+                    Gas backup eliminates multi-day storage needs.
                   </div>
                 </div>
 
-                <div style={{background:"#1a1d25", border:"1px solid #2A3040", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#B8A060", fontFamily:F.m, fontWeight:700, marginBottom:10}}>THE OVERBUILD CLIFF</div>
-                  <div style={{fontSize:28, color:"#B8A060", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:16}}>
+                  <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.5px"}}>Solar Capacity</div>
+                  <div style={{fontSize:22, color:"#E8E6E1", fontFamily:F.m, fontWeight:700, marginBottom:8}}>
                     {computed.sb?.sz?.solarMW && computed.swgb?.sz?.solarMW ?
-                      Math.round((1 - computed.swgb.sz.solarMW / computed.sb.sz.solarMW) * 100) : 80}% less
+                      Math.round((1 - computed.swgb.sz.solarMW / computed.sb.sz.solarMW) * 100) : 80}% reduction
                   </div>
-                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
-                    Solar-only needs <b style={{color:"#E8E6E1"}}>{computed.sb?.sz?.solarMW?.toLocaleString() || "5,500"} MW</b> of panels.<br/>
-                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.solarMW?.toLocaleString() || "1,100"} MW</b>.<br/><br/>
-                    <span style={{color:"#B8A060"}}>Why?</span> Without gas, you must generate enough surplus on sunny days to store for cloudy weeks.
-                    With gas, you only need to cover typical conditions.
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    Solar-only requires {computed.sb?.sz?.solarMW?.toLocaleString() || "5,500"} MW.
+                    Hybrid requires only {computed.swgb?.sz?.solarMW?.toLocaleString() || "1,100"} MW.
+                    No need to overbuild for worst-case scenarios.
                   </div>
                 </div>
 
-                <div style={{background:"#1a1d25", border:"1px solid #2A3040", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#B85C5C", fontFamily:F.m, fontWeight:700, marginBottom:10}}>THE GAS EFFICIENCY</div>
-                  <div style={{fontSize:28, color:"#B85C5C", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
+                <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:16}}>
+                  <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.5px"}}>Gas Capacity</div>
+                  <div style={{fontSize:22, color:"#E8E6E1", fontFamily:F.m, fontWeight:700, marginBottom:8}}>
                     {computed.gu?.sz?.gasMW && computed.swgb?.sz?.gasMW ?
-                      Math.round((1 - computed.swgb.sz.gasMW / computed.gu.sz.gasMW) * 100) : 50}% less capacity
+                      Math.round((1 - computed.swgb.sz.gasMW / computed.gu.sz.gasMW) * 100) : 50}% reduction
                   </div>
-                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
-                    Gas-only needs <b style={{color:"#E8E6E1"}}>{computed.gu?.sz?.gasMW?.toLocaleString() || "1,200"} MW</b> running 24/7.<br/>
-                    Hybrid needs only <b style={{color:"#E8E6E1"}}>{computed.swgb?.sz?.gasMW?.toLocaleString() || "600"} MW</b> for backup.<br/><br/>
-                    <span style={{color:"#B85C5C"}}>Why?</span> Renewables cover ~65% of energy. Gas only fills gaps, so you need less installed capacity
-                    and burn far less fuel.
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    Gas-only requires {computed.gu?.sz?.gasMW?.toLocaleString() || "1,200"} MW at 100% utilization.
+                    Hybrid requires only {computed.swgb?.sz?.gasMW?.toLocaleString() || "600"} MW.
+                    Renewables displace 65% of fuel consumption.
                   </div>
                 </div>
 
-                <div style={{background:"#1a1d25", border:"1px solid #2A3040", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#7090B8", fontFamily:F.m, fontWeight:700, marginBottom:10}}>THE DIVERSIFICATION BENEFIT</div>
-                  <div style={{fontSize:28, color:"#7090B8", fontFamily:F.m, fontWeight:700, marginBottom:4}}>
-                    Complementary
+                <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:16}}>
+                  <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, fontWeight:600, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.5px"}}>Resource Diversification</div>
+                  <div style={{fontSize:22, color:"#E8E6E1", fontFamily:F.m, fontWeight:700, marginBottom:8}}>
+                    Complementary profiles
                   </div>
-                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
-                    Solar peaks midday. Wind often peaks at night and in winter.<br/>
-                    Combined, they have <b style={{color:"#E8E6E1"}}>less total variability</b> than either alone.<br/><br/>
-                    <span style={{color:"#7090B8"}}>Result:</span> Solar+Wind+Battery needs less storage than Solar+Battery alone,
-                    because wind fills some of solar's gaps (and vice versa).
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    Solar peaks midday; wind peaks at night and winter.
+                    Combined variability is lower than either alone.
+                    Further reduces storage requirements.
                   </div>
                 </div>
               </div>
@@ -1685,9 +1681,9 @@ export default function App() {
                     ))}
 
                     {/* Zones */}
-                    <rect x={pad.l} y={pad.t} width={cw*0.35} height={ch} fill="#ef444408"/>
+                    <rect x={pad.l} y={pad.t} width={cw*0.35} height={ch} fill="#1a1d2510"/>
                     <rect x={pad.l+cw*0.35} y={pad.t} width={cw*0.35} height={ch} fill="#E8A83808"/>
-                    <rect x={pad.l+cw*0.7} y={pad.t} width={cw*0.3} height={ch} fill="#10b98108"/>
+                    <rect x={pad.l+cw*0.7} y={pad.t} width={cw*0.3} height={ch} fill="#1a1d2510"/>
 
                     <text x={pad.l+cw*0.15} y={pad.t+15} textAnchor="middle" fill="#ef4444" fontSize={8} fontFamily={F.m}>Gas Heavy</text>
                     <text x={pad.l+cw*0.52} y={pad.t+15} textAnchor="middle" fill="#E8A838" fontSize={8} fontFamily={F.m}>Hybrid Zone</text>
@@ -1826,7 +1822,7 @@ export default function App() {
                 );
               })()}
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginTop:10, lineHeight:1.7}}>
-                <b style={{color:"#E8E6E1"}}>The key insight:</b> Infrastructure requirements grow <b style={{color:"#B85C5C"}}>exponentially</b> as you approach 0% gas.
+                <b style={{color:"#E8E6E1"}}>The key insight:</b> Infrastructure requirements grow <b style={{color:"#9CA3AF"}}>exponentially</b> as you approach 0% gas.
                 The last 35% of gas to eliminate requires more additional infrastructure than the first 65%.
                 This is why the hybrid "sweet spot" exists — you get most of the fuel savings with minimal infrastructure penalty.
               </div>
@@ -1836,8 +1832,8 @@ export default function App() {
             <div style={PS}>
               <div style={SL}>THE UNDERLYING MATH</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#B85C5C", fontFamily:F.m, fontWeight:700, marginBottom:10}}>GAS-ONLY COST STRUCTURE</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:10}}>GAS-ONLY COST STRUCTURE</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
                     <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
                       <span>Capex (~$900/kW × 1.2 GW)</span>
@@ -1845,17 +1841,17 @@ export default function App() {
                     </div>
                     <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
                       <span>Annual Fuel (100% × 8760h × ${(p.gasPrice * p.heatRate).toFixed(1)}/MWh)</span>
-                      <span style={{color:"#B85C5C", fontWeight:600}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
+                      <span style={{color:"#9CA3AF", fontWeight:600}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
                     </div>
                     <div style={{display:"flex", justifyContent:"space-between", paddingTop:4}}>
                       <span style={{color:"#E8E6E1", fontWeight:600}}>Fuel over {p.life} years</span>
-                      <span style={{color:"#B85C5C", fontWeight:700}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
+                      <span style={{color:"#9CA3AF", fontWeight:700}}>${(p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
                     </div>
                   </div>
                 </div>
 
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:11, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:10}}>HYBRID COST STRUCTURE</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:11, color:"#C9B896", fontFamily:F.m, fontWeight:700, marginBottom:10}}>HYBRID COST STRUCTURE</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
                     <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
                       <span>Capex (Solar+Wind+Batt+Gas)</span>
@@ -1863,48 +1859,48 @@ export default function App() {
                     </div>
                     <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
                       <span>Less: ITC Credit (30% on solar+batt)</span>
-                      <span style={{color:"#6B9080"}}>-{fmt$((computed.swgb?.lcoe?.capexBreakdown?.solar || 0) * 0.3 + (computed.swgb?.lcoe?.capexBreakdown?.battery || 0) * 0.3)}</span>
+                      <span style={{color:"#9CA3AF"}}>-{fmt$((computed.swgb?.lcoe?.capexBreakdown?.solar || 0) * 0.3 + (computed.swgb?.lcoe?.capexBreakdown?.battery || 0) * 0.3)}</span>
                     </div>
                     <div style={{display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A3040", paddingBottom:4, marginBottom:4}}>
                       <span>Annual Fuel (35% × 8760h × ${(p.gasPrice * p.heatRate).toFixed(1)}/MWh)</span>
-                      <span style={{color:"#E8A838", fontWeight:600}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
+                      <span style={{color:"#C9B896", fontWeight:600}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW / 1e6).toFixed(0)}M/yr</span>
                     </div>
                     <div style={{display:"flex", justifyContent:"space-between", paddingTop:4}}>
                       <span style={{color:"#E8E6E1", fontWeight:600}}>Fuel over {p.life} years</span>
-                      <span style={{color:"#E8A838", fontWeight:700}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
+                      <span style={{color:"#C9B896", fontWeight:700}}>${(0.35 * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div style={{marginTop:16, padding:14, background:"#1a1d25", borderRadius:8, border:"1px solid #2A3040"}}>
+              <div style={{marginTop:16, padding:14, background:"#12151C", borderRadius:8, border:"1px solid #1E2330"}}>
                 <div style={{fontSize:11, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.8}}>
-                  <b style={{color:"#E8A838"}}>The tradeoff:</b> Hybrid has ~{fmt$(Math.abs((computed.swgb?.lcoe?.netCapex || 2500000000) - (computed.gu?.lcoe?.netCapex || 1080000000)))} higher capex,
-                  but saves ~<b style={{color:"#6B9080"}}>${((1-0.35) * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</b> in fuel over {p.life} years.
+                  <b style={{color:"#C9B896"}}>The tradeoff:</b> Hybrid has ~{fmt$(Math.abs((computed.swgb?.lcoe?.netCapex || 2500000000) - (computed.gu?.lcoe?.netCapex || 1080000000)))} higher capex,
+                  but saves ~<b style={{color:"#9CA3AF"}}>${((1-0.35) * p.gasPrice * p.heatRate * 8760 * p.loadMW * p.life / 1e9).toFixed(1)}B</b> in fuel over {p.life} years.
                   <br/><br/>
-                  Add the <b style={{color:"#7090B8"}}>ITC/PTC incentives</b> and the economics converge.
+                  Add the <b style={{color:"#9CA3AF"}}>ITC/PTC incentives</b> and the economics converge.
                 </div>
               </div>
             </div>
 
             {/* Key Takeaways */}
-            <div style={{...PS, background:"#1a1d25", border:"1px solid #2A3040"}}>
+            <div style={{...PS, background:"#12151C", border:"1px solid #1E2330"}}>
               <div style={SL}>KEY TAKEAWAYS</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
                 <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #4B5563"}}>
-                  <div style={{fontSize:10, color:"#6B9080", fontFamily:F.m, fontWeight:700, marginBottom:6}}>1. GAS PROVIDES CAPACITY</div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:6}}>1. GAS PROVIDES CAPACITY</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     Gas is "reliability insurance." It eliminates the need for weeks of battery storage and massive renewable overbuild.
                   </div>
                 </div>
                 <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #4B5563"}}>
-                  <div style={{fontSize:10, color:"#B8A060", fontFamily:F.m, fontWeight:700, marginBottom:6}}>2. RENEWABLES PROVIDE ENERGY</div>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:6}}>2. RENEWABLES PROVIDE ENERGY</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     Every MWh from solar/wind displaces expensive gas fuel. Zero marginal cost generation is the key to long-term savings.
                   </div>
                 </div>
                 <div style={{padding:12, background:"#0a0c0f", borderRadius:6, borderLeft:"3px solid #4B5563"}}>
-                  <div style={{fontSize:10, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:6}}>3. HYBRID OPTIMIZES BOTH</div>
+                  <div style={{fontSize:10, color:"#C9B896", fontFamily:F.m, fontWeight:700, marginBottom:6}}>3. HYBRID OPTIMIZES BOTH</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     The "sweet spot" uses gas for ~35% of energy. You get most fuel savings with minimal infrastructure penalty.
                   </div>
@@ -1913,8 +1909,8 @@ export default function App() {
             </div>
 
             {/* ===== MATHEMATICAL FOUNDATION ===== */}
-            <div style={{...PS, background:"#1a1d25", border:"1px solid #2A3040"}}>
-              <div style={{...SL, color:"#7090B8"}}>MATHEMATICAL FOUNDATION</div>
+            <div style={{...PS, background:"#12151C", border:"1px solid #1E2330"}}>
+              <div style={{...SL, color:"#9CA3AF"}}>MATHEMATICAL FOUNDATION</div>
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginBottom:16, lineHeight:1.7}}>
                 The hybrid advantage emerges from fundamental mathematics of <b style={{color:"#E8E6E1"}}>energy</b> vs <b style={{color:"#E8E6E1"}}>capacity</b>.
               </div>
@@ -1924,8 +1920,8 @@ export default function App() {
             <div style={PS}>
               <div style={SL}>THE TWO CONSTRAINTS THAT GOVERN POWER SYSTEMS</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:20}}>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:16, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:12, color:"#B8A060", fontFamily:F.m, fontWeight:700, marginBottom:12}}>1. ENERGY BALANCE</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:16, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:12, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:12}}>1. ENERGY BALANCE</div>
                   <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", background:"#0f1115", padding:12, borderRadius:6, marginBottom:12}}>
                     Sum(Generation) = Sum(Load) + Losses
                   </div>
@@ -1938,14 +1934,14 @@ export default function App() {
                     <span style={{color:"#E8E6E1"}}>Renewables excel here</span> - zero fuel cost.
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:16, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:12, color:"#B85C5C", fontFamily:F.m, fontWeight:700, marginBottom:12}}>2. CAPACITY ADEQUACY</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:16, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:12, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:12}}>2. CAPACITY ADEQUACY</div>
                   <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", background:"#0f1115", padding:12, borderRadius:6, marginBottom:12}}>
                     At all times: Available {">"} Load
                   </div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
                     At <b>every instant</b>, available generation must meet load.
-                    This is the <b style={{color:"#B85C5C"}}>binding constraint</b>.
+                    This is the <b style={{color:"#9CA3AF"}}>binding constraint</b>.
                     <br/><br/>
                     Solar: ~10-15% capacity credit.<br/>
                     Gas: ~95-100% capacity credit.<br/>
@@ -1954,11 +1950,11 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <div style={{marginTop:16, padding:14, background:"#E8A83812", borderRadius:8, border:"1px solid #2A3040"}}>
+              <div style={{marginTop:16, padding:14, background:"#E8A83812", borderRadius:8, border:"1px solid #1E2330"}}>
                 <div style={{fontSize:10, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.7}}>
-                  <b style={{color:"#E8A838"}}>Insight:</b> These constraints need <i>different</i> resources.
+                  <b style={{color:"#C9B896"}}>Insight:</b> These constraints need <i>different</i> resources.
                   Energy is cheap from renewables. Capacity is cheap from gas.
-                  <b style={{color:"#E8A838"}}> Hybrid optimizes both.</b>
+                  <b style={{color:"#C9B896"}}> Hybrid optimizes both.</b>
                 </div>
               </div>
             </div>
@@ -1967,7 +1963,7 @@ export default function App() {
             <div style={PS}>
               <div style={SL}>THE STORAGE DURATION PROBLEM</div>
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginBottom:16}}>
-                Battery requirements <b style={{color:"#B85C5C"}}>explode</b> as gas approaches 0%.
+                Battery requirements <b style={{color:"#9CA3AF"}}>explode</b> as gas approaches 0%.
               </div>
               {/* Storage Duration Chart */}
               {(()=>{
@@ -1985,15 +1981,15 @@ export default function App() {
                 const y = (hrs) => pad.t + ch - (Math.min(hrs,maxH)/maxH) * ch;
                 return (
                   <svg width={W} height={H} style={{display:"block", marginBottom:16}}>
-                    <rect x={pad.l} y={pad.t} width={cw*0.5} height={ch} fill="#10b98108"/>
-                    <rect x={pad.l+cw*0.5} y={pad.t} width={cw*0.5} height={ch} fill="#ef444408"/>
+                    <rect x={pad.l} y={pad.t} width={cw*0.5} height={ch} fill="#1a1d2510"/>
+                    <rect x={pad.l+cw*0.5} y={pad.t} width={cw*0.5} height={ch} fill="#1a1d2510"/>
                     {[0,24,48,72,120,168].map(hrs => (
                       <g key={"g-"+hrs}>
                         <line x1={pad.l} y1={y(hrs)} x2={pad.l+cw} y2={y(hrs)} stroke="#1E2330" strokeWidth={1}/>
                         <text x={pad.l-8} y={y(hrs)+4} textAnchor="end" fill="#6B7280" fontSize={8} fontFamily={F.m}>{hrs}h</text>
                       </g>
                     ))}
-                    <rect x={x(99)} y={pad.t} width={x(100)-x(99)} height={ch} fill="#ef444415"/>
+                    <rect x={x(99)} y={pad.t} width={x(100)-x(99)} height={ch} fill="#ef444410"/>
                     <text x={x(99.5)} y={pad.t+15} textAnchor="middle" fill="#ef4444" fontSize={8} fontFamily={F.m}>Danger Zone</text>
                     <line x1={pad.l} y1={pad.t+ch} x2={pad.l+cw} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
                     <line x1={pad.l} y1={pad.t} x2={pad.l} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
@@ -2033,8 +2029,8 @@ export default function App() {
                 As reliability increases, renewables-only storage explodes exponentially while hybrid stays flat at 4 hours.
               </div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:10, color:"#B85C5C", fontWeight:700, marginBottom:8}}>WHY EXPONENTIAL?</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontWeight:700, marginBottom:8}}>WHY EXPONENTIAL?</div>
                   <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.7}}>
                     Weather follows <b style={{color:"#E8E6E1"}}>heavy-tailed distribution</b>:<br/>
                     - Most gaps short (overnight)<br/>
@@ -2042,13 +2038,13 @@ export default function App() {
                     - Must size for 1-in-10,000 event
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:10, color:"#6B9080", fontWeight:700, marginBottom:8}}>WHY HYBRID FLAT?</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontWeight:700, marginBottom:8}}>WHY HYBRID FLAT?</div>
                   <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.7}}>
                     With gas backup, battery only needs:<br/>
                     - Daily shifting (4h)<br/>
                     - Short ramps<br/>
-                    <b style={{color:"#6B9080"}}>Gas handles the long-tail.</b>
+                    <b style={{color:"#9CA3AF"}}>Gas handles the long-tail.</b>
                   </div>
                 </div>
               </div>
@@ -2058,36 +2054,36 @@ export default function App() {
             <div style={PS}>
               <div style={SL}>MARGINAL COST OF DISPLACEMENT</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:10, color:"#6B9080", fontWeight:700, marginBottom:8}}>FIRST 35%</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontWeight:700, marginBottom:8}}>FIRST 35%</div>
                   <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
                     Best hours displace gas.<br/>
                     Minimal storage.<br/>
-                    <b style={{color:"#6B9080"}}>~$15-25/MWh</b>
+                    <b style={{color:"#9CA3AF"}}>~$15-25/MWh</b>
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:10, color:"#B8A060", fontWeight:700, marginBottom:8}}>35-65%</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontWeight:700, marginBottom:8}}>35-65%</div>
                   <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
                     4h battery needed.<br/>
                     Still economic.<br/>
-                    <b style={{color:"#B8A060"}}>~$40-60/MWh</b>
+                    <b style={{color:"#9CA3AF"}}>~$40-60/MWh</b>
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:8, padding:14}}>
-                  <div style={{fontSize:10, color:"#B85C5C", fontWeight:700, marginBottom:8}}>LAST 35%</div>
+                <div style={{background:"#12151C", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#9CA3AF", fontWeight:700, marginBottom:8}}>LAST 35%</div>
                   <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
                     Days of storage.<br/>
                     Massive overbuild.<br/>
-                    <b style={{color:"#B85C5C"}}>{">"} $200/MWh</b>
+                    <b style={{color:"#9CA3AF"}}>{">"} $200/MWh</b>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Theorem */}
-            <div style={{...PS, background:"#1a1d25", border:"1px solid #2A3040"}}>
-              <div style={{fontSize:12, color:"#E8A838", fontWeight:700, marginBottom:12}}>THE FUNDAMENTAL THEOREM</div>
+            <div style={{...PS, background:"#12151C", border:"1px solid #1E2330"}}>
+              <div style={{fontSize:12, color:"#C9B896", fontWeight:700, marginBottom:12}}>THE FUNDAMENTAL THEOREM</div>
               <div style={{background:"#0f1115", borderRadius:8, padding:16, marginBottom:16}}>
                 <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", textAlign:"center", lineHeight:2}}>
                   Optimal f* minimizes: Total(f) = Capex(f) + Storage(f) + Fuel(f)<br/>
@@ -2151,7 +2147,7 @@ export default function App() {
                     • Overbuild 5-6x to capture enough energy<br/>
                     • Store 20+ hours of battery for nights<br/>
                     • Handle multi-day cloudy periods<br/>
-                    • Result: <span style={{color:"#B85C5C"}}>Massive capex, still not 100% reliable</span>
+                    • Result: <span style={{color:"#9CA3AF"}}>Massive capex, still not 100% reliable</span>
                   </div>
                 </div>
                 <div>
@@ -2161,7 +2157,7 @@ export default function App() {
                     • Build "just enough" renewables for typical conditions<br/>
                     • 4-hour battery for daily solar shifting<br/>
                     • Gas fills gaps during weather events<br/>
-                    • Result: <span style={{color:"#6B9080"}}>Optimized capex, 100% reliable</span>
+                    • Result: <span style={{color:"#9CA3AF"}}>Optimized capex, 100% reliable</span>
                   </div>
                 </div>
               </div>
@@ -2174,10 +2170,10 @@ export default function App() {
                 <thead>
                   <tr style={{borderBottom:"2px solid #2A3040"}}>
                     <th style={{padding:"8px 4px", textAlign:"left", color:"#6B7280", fontSize:9}}>Configuration</th>
-                    <th style={{padding:"8px 4px", textAlign:"right", color:"#B8A060", fontSize:9}}>Solar MW</th>
-                    <th style={{padding:"8px 4px", textAlign:"right", color:"#7090B8", fontSize:9}}>Wind MW</th>
-                    <th style={{padding:"8px 4px", textAlign:"right", color:"#B85C5C", fontSize:9}}>Gas MW</th>
-                    <th style={{padding:"8px 4px", textAlign:"right", color:"#6B9080", fontSize:9}}>Battery MWh</th>
+                    <th style={{padding:"8px 4px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Solar MW</th>
+                    <th style={{padding:"8px 4px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Wind MW</th>
+                    <th style={{padding:"8px 4px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Gas MW</th>
+                    <th style={{padding:"8px 4px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Battery MWh</th>
                     <th style={{padding:"8px 4px", textAlign:"right", color:"#9CA3AF", fontSize:9}}>Overbuild</th>
                     <th style={{padding:"8px 4px", textAlign:"right", color:"#E8E6E1", fontSize:9}}>LCOE</th>
                   </tr>
@@ -2316,8 +2312,8 @@ export default function App() {
             <div style={PS}>
               <div style={SL}>THE ECONOMIC THEORY</div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16}}>
-                <div style={{background:"#1a1d25", borderRadius:6, padding:12, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:11, color:"#B85C5C", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Gas-Only</div>
+                <div style={{background:"#12151C", borderRadius:6, padding:12, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:11, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Gas-Only</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     <div style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Pros:</b></div>
                     • Low capex (~$900/kW)<br/>
@@ -2329,8 +2325,8 @@ export default function App() {
                     • Carbon risk
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:6, padding:12, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:11, color:"#6B9080", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Renewables-Only</div>
+                <div style={{background:"#12151C", borderRadius:6, padding:12, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:11, color:"#9CA3AF", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Renewables-Only</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     <div style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Pros:</b></div>
                     • Zero fuel cost<br/>
@@ -2342,15 +2338,15 @@ export default function App() {
                     • Need 20hr+ storage
                   </div>
                 </div>
-                <div style={{background:"#1a1d25", borderRadius:6, padding:12, border:"1px solid #2A3040"}}>
-                  <div style={{fontSize:11, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Hybrid (The Unlock)</div>
+                <div style={{background:"#12151C", borderRadius:6, padding:12, border:"1px solid #1E2330"}}>
+                  <div style={{fontSize:11, color:"#C9B896", fontFamily:F.m, fontWeight:700, marginBottom:8}}>Hybrid (The Unlock)</div>
                   <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.6}}>
                     <div style={{marginBottom:6}}><b style={{color:"#E8E6E1"}}>Best of both:</b></div>
                     • Renewables for cheap energy<br/>
                     • Gas for reliable capacity<br/>
                     • Minimal overbuild needed<br/>
                     • 4hr battery (not 20hr)<br/>
-                    <div style={{marginTop:8}}><b style={{color:"#6B9080"}}>Gas burns only {((results.swgb?.gasFrac||0.35)*100).toFixed(0)}% of hours</b></div>
+                    <div style={{marginTop:8}}><b style={{color:"#9CA3AF"}}>Gas burns only {((results.swgb?.gasFrac||0.35)*100).toFixed(0)}% of hours</b></div>
                   </div>
                 </div>
               </div>
@@ -2367,7 +2363,7 @@ export default function App() {
                   const fuelPct = r.lcoe > 0 ? (r.lcoeFuel / r.lcoe * 100) : 0;
                   const ptcPct = r.lcoe > 0 ? (r.lcoePTC / r.lcoe * 100) : 0;
                   return (
-                    <div key={s.id} style={{background:"#1a1d25", borderRadius:6, padding:10}}>
+                    <div key={s.id} style={{background:"#12151C", borderRadius:6, padding:10}}>
                       <div style={{fontSize:10, color:s.color, fontFamily:F.m, fontWeight:700, marginBottom:8}}>{s.short}</div>
                       <div style={{fontSize:18, color:"#E8E6E1", fontFamily:F.m, fontWeight:700}}>${r.lcoe.toFixed(1)}</div>
                       <div style={{marginTop:8}}>
@@ -2379,8 +2375,8 @@ export default function App() {
                         <div style={{fontSize:7, color:"#6B7280", fontFamily:F.m}}>
                           <span style={{color:"#6366f1"}}>■</span> Capex ${r.lcoeCapex.toFixed(1)} |
                           <span style={{color:"#8b5cf6"}}> ■</span> O&M ${r.lcoeOM.toFixed(1)} |
-                          <span style={{color:"#B85C5C"}}> ■</span> Fuel ${r.lcoeFuel.toFixed(1)}
-                          {r.lcoePTC > 0 && <span style={{color:"#6B9080"}}> | ■ PTC -${r.lcoePTC.toFixed(1)}</span>}
+                          <span style={{color:"#9CA3AF"}}> ■</span> Fuel ${r.lcoeFuel.toFixed(1)}
+                          {r.lcoePTC > 0 && <span style={{color:"#9CA3AF"}}> | ■ PTC -${r.lcoePTC.toFixed(1)}</span>}
                         </div>
                       </div>
                     </div>
@@ -2390,13 +2386,13 @@ export default function App() {
             </div>
 
             {/* Key Insight */}
-            <div style={{...PS, background:"linear-gradient(135deg, #1a1d25 0%, #12151C 100%)", border:"1px solid #2A3040"}}>
-              <div style={{fontSize:12, color:"#E8A838", fontFamily:F.m, fontWeight:700, marginBottom:8}}>💡 THE KEY INSIGHT</div>
+            <div style={{...PS, background:"linear-gradient(135deg, #1a1d25 0%, #12151C 100%)", border:"1px solid #1E2330"}}>
+              <div style={{fontSize:12, color:"#C9B896", fontFamily:F.m, fontWeight:700, marginBottom:8}}>💡 THE KEY INSIGHT</div>
               <div style={{fontSize:11, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.8}}>
-                Gas-only pays <b style={{color:"#B85C5C"}}>${(p.gasPrice * p.heatRate).toFixed(1)}/MWh in fuel</b> for 100% of generation.<br/>
-                Hybrid pays the same fuel rate but <b style={{color:"#6B9080"}}>only for ~35% of generation</b>.<br/>
-                The <b style={{color:"#E8A838"}}>65% fuel savings</b> funds the additional renewable + battery capex.<br/>
-                Add <b style={{color:"#7090B8"}}>30% ITC + Wind PTC</b> incentives, and the math works out to similar LCOE.
+                Gas-only pays <b style={{color:"#9CA3AF"}}>${(p.gasPrice * p.heatRate).toFixed(1)}/MWh in fuel</b> for 100% of generation.<br/>
+                Hybrid pays the same fuel rate but <b style={{color:"#9CA3AF"}}>only for ~35% of generation</b>.<br/>
+                The <b style={{color:"#C9B896"}}>65% fuel savings</b> funds the additional renewable + battery capex.<br/>
+                Add <b style={{color:"#9CA3AF"}}>30% ITC + Wind PTC</b> incentives, and the math works out to similar LCOE.
               </div>
               <div style={{marginTop:12, padding:10, background:"#0f1115", borderRadius:6}}>
                 <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m, fontStyle:"italic"}}>
