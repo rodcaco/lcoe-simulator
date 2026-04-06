@@ -684,7 +684,7 @@ export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
   const [tabOrder, setTabOrder] = useState(() => {
-    const defaultOrder = ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
+    const defaultOrder = ["overview","thesis","correlation","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
     const saved = localStorage.getItem("lcoe_tabOrder_v2");
     if (!saved) return defaultOrder;
     const parsed = JSON.parse(saved);
@@ -2124,6 +2124,245 @@ export default function App() {
               </table>
             </div>
           )}
+
+
+          {/* ===== CORRELATION ===== */}
+          {tab==="correlation"&&(<>
+            <div style={PS}>
+              <div style={SL}>WIND-SOLAR DIURNAL CORRELATION</div>
+              <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m, marginBottom:16}}>
+                Western Oklahoma / panhandle corridor — yearly-averaged hourly profiles
+              </div>
+
+              {(()=>{
+                // Wind CF profile - peaks overnight due to Low-Level Jet
+                const windShape = [0.82,0.85,0.87,0.88,0.86,0.83,0.76,0.67,0.58,0.51,0.46,0.43,0.42,0.43,0.46,0.50,0.55,0.62,0.70,0.76,0.80,0.82,0.82,0.82];
+                const windAvgShape = windShape.reduce((a,b)=>a+b,0)/24;
+                const windCF = windShape.map(s => (s/windAvgShape) * (corrWindPeak/100) * windAvgShape);
+
+                // Solar CF profile - Gaussian centered at 13:00
+                const solarCF = Array.from({length:24}, (_,h) => {
+                  if (h < 6 || h > 20) return 0;
+                  const x = (h - 13) / 4.5;
+                  return (corrSolarPeak/100) * Math.exp(-0.5 * x * x);
+                });
+
+                const totalNP = corrWindMW + corrSolarMW;
+                const blendedCF = Array.from({length:24}, (_,i) => totalNP > 0 ? (windCF[i]*corrWindMW + solarCF[i]*corrSolarMW)/totalNP : 0);
+                const windOut = windCF.map(c => c * corrWindMW);
+                const solarOut = solarCF.map(c => c * corrSolarMW);
+                const combined = windOut.map((w,i) => w + solarOut[i]);
+                const dcLoad = totalNP * 0.4;
+
+                // Pearson correlation
+                const wAvg = windCF.reduce((a,b)=>a+b,0)/24;
+                const sAvg = solarCF.reduce((a,b)=>a+b,0)/24;
+                let num=0, dx2=0, dy2=0;
+                for (let i=0; i<24; i++) {
+                  const dx = windCF[i]-wAvg, dy = solarCF[i]-sAvg;
+                  num += dx*dy; dx2 += dx*dx; dy2 += dy*dy;
+                }
+                const pearsonR = dy2===0 ? 0 : num/Math.sqrt(dx2*dy2);
+                const bAvg = blendedCF.reduce((a,b)=>a+b,0)/24;
+
+                // Surplus/deficit
+                const surplus = combined.map(c => Math.max(0, c - dcLoad));
+                const deficit = combined.map(c => Math.min(0, c - dcLoad));
+                const surplusHrs = surplus.filter(s => s > 0);
+                const deficitHrs = deficit.filter(d => d < 0);
+                const avgSurplus = surplusHrs.length > 0 ? surplusHrs.reduce((a,b)=>a+b,0)/surplusHrs.length : 0;
+                const avgDeficit = deficitHrs.length > 0 ? Math.abs(deficitHrs.reduce((a,b)=>a+b,0)/deficitHrs.length) : 0;
+
+                // Chart dimensions
+                const W=720, H=220, pad={t:20,r:30,b:35,l:50};
+                const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+                const maxMW = Math.max(...combined, dcLoad) * 1.1;
+                const x = (i) => pad.l + (i/23)*cw;
+                const yMW = (v) => pad.t + ch - (v/maxMW)*ch;
+                const yCF = (v) => pad.t + ch - (v/0.7)*ch;
+
+                return (
+                  <>
+                    {/* Metrics */}
+                    <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:12, marginBottom:20}}>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Pearson r</div>
+                        <div style={{fontSize:20, color:"#E8E6E1", fontWeight:700}}>{pearsonR.toFixed(3)}</div>
+                      </div>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Wind avg CF</div>
+                        <div style={{fontSize:20, color:"#E8E6E1", fontWeight:700}}>{(wAvg*100).toFixed(1)}%</div>
+                      </div>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Solar avg CF</div>
+                        <div style={{fontSize:20, color:"#E8E6E1", fontWeight:700}}>{(sAvg*100).toFixed(1)}%</div>
+                      </div>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Blended CF</div>
+                        <div style={{fontSize:20, color:"#E8E6E1", fontWeight:700}}>{(bAvg*100).toFixed(1)}%</div>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:20}}>
+                      <div>
+                        <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:8}}>
+                          <span style={{fontSize:10, color:"#6B7280", width:80}}>Wind peak CF</span>
+                          <input type="range" min={40} max={65} value={corrWindPeak} onChange={e=>setCorrWindPeak(+e.target.value)} style={{flex:1}}/>
+                          <span style={{fontSize:10, color:"#E8E6E1", width:40}}>{corrWindPeak}%</span>
+                        </div>
+                        <div style={{display:"flex", alignItems:"center", gap:12}}>
+                          <span style={{fontSize:10, color:"#6B7280", width:80}}>Solar peak CF</span>
+                          <input type="range" min={15} max={35} value={corrSolarPeak} onChange={e=>setCorrSolarPeak(+e.target.value)} style={{flex:1}}/>
+                          <span style={{fontSize:10, color:"#E8E6E1", width:40}}>{corrSolarPeak}%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:8}}>
+                          <span style={{fontSize:10, color:"#6B7280", width:80}}>Wind MW</span>
+                          <input type="range" min={100} max={2000} step={50} value={corrWindMW} onChange={e=>setCorrWindMW(+e.target.value)} style={{flex:1}}/>
+                          <span style={{fontSize:10, color:"#E8E6E1", width:50}}>{corrWindMW}</span>
+                        </div>
+                        <div style={{display:"flex", alignItems:"center", gap:12}}>
+                          <span style={{fontSize:10, color:"#6B7280", width:80}}>Solar MW</span>
+                          <input type="range" min={0} max={2000} step={50} value={corrSolarMW} onChange={e=>setCorrSolarMW(+e.target.value)} style={{flex:1}}/>
+                          <span style={{fontSize:10, color:"#E8E6E1", width:50}}>{corrSolarMW}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MW Output Chart */}
+                    <div style={{marginBottom:24}}>
+                      <div style={{fontSize:10, color:"#6B7280", marginBottom:8}}>
+                        Total MW output by hour
+                        <span style={{marginLeft:16, color:"#3b82f6"}}>● Wind</span>
+                        <span style={{marginLeft:12, color:"#eab308"}}>● Solar</span>
+                        <span style={{marginLeft:12, color:"#22c55e"}}>● Combined</span>
+                        <span style={{marginLeft:12, color:"#ef4444"}}>― DC Load</span>
+                      </div>
+                      <svg width={W} height={H} style={{display:"block"}}>
+                        {[0,0.25,0.5,0.75,1].map(p => (
+                          <g key={"g"+p}>
+                            <line x1={pad.l} y1={pad.t+ch*(1-p)} x2={pad.l+cw} y2={pad.t+ch*(1-p)} stroke="#1E2330" strokeWidth={1}/>
+                            <text x={pad.l-6} y={pad.t+ch*(1-p)+4} textAnchor="end" fill="#6B7280" fontSize={8}>{Math.round(maxMW*p)}</text>
+                          </g>
+                        ))}
+                        {[0,6,12,18,23].map(h => (
+                          <text key={"x"+h} x={x(h)} y={H-8} textAnchor="middle" fill="#6B7280" fontSize={8}>{h}:00</text>
+                        ))}
+                        {/* Wind area */}
+                        <path d={`M${x(0)},${yMW(0)} ${windOut.map((v,i)=>`L${x(i)},${yMW(v)}`).join(" ")} L${x(23)},${yMW(0)} Z`} fill="#3b82f620"/>
+                        <path d={windOut.map((v,i)=>`${i===0?"M":"L"}${x(i)},${yMW(v)}`).join(" ")} stroke="#3b82f6" strokeWidth={2} fill="none"/>
+                        {/* Solar area */}
+                        <path d={`M${x(0)},${yMW(0)} ${solarOut.map((v,i)=>`L${x(i)},${yMW(v)}`).join(" ")} L${x(23)},${yMW(0)} Z`} fill="#eab30820"/>
+                        <path d={solarOut.map((v,i)=>`${i===0?"M":"L"}${x(i)},${yMW(v)}`).join(" ")} stroke="#eab308" strokeWidth={2} fill="none"/>
+                        {/* Combined */}
+                        <path d={combined.map((v,i)=>`${i===0?"M":"L"}${x(i)},${yMW(v)}`).join(" ")} stroke="#22c55e" strokeWidth={2.5} fill="none"/>
+                        {/* DC Load */}
+                        <line x1={pad.l} y1={yMW(dcLoad)} x2={pad.l+cw} y2={yMW(dcLoad)} stroke="#ef4444" strokeWidth={2} strokeDasharray="6,4"/>
+                        <text x={pad.l+cw-4} y={yMW(dcLoad)-6} textAnchor="end" fill="#ef4444" fontSize={8}>{Math.round(dcLoad)} MW load</text>
+                      </svg>
+                    </div>
+
+                    {/* Capacity Factor Chart */}
+                    <div style={{marginBottom:24}}>
+                      <div style={{fontSize:10, color:"#6B7280", marginBottom:8}}>
+                        Capacity factor view
+                        <span style={{marginLeft:16, color:"#3b82f6"}}>● Wind CF</span>
+                        <span style={{marginLeft:12, color:"#eab308"}}>● Solar CF</span>
+                        <span style={{marginLeft:12, color:"#a855f7"}}>― Blended CF</span>
+                      </div>
+                      <svg width={W} height={180} style={{display:"block"}}>
+                        {[0,0.25,0.5,0.75,1].map(p => (
+                          <g key={"g"+p}>
+                            <line x1={pad.l} y1={20+140*(1-p)} x2={pad.l+cw} y2={20+140*(1-p)} stroke="#1E2330" strokeWidth={1}/>
+                            <text x={pad.l-6} y={20+140*(1-p)+4} textAnchor="end" fill="#6B7280" fontSize={8}>{Math.round(70*p)}%</text>
+                          </g>
+                        ))}
+                        {[0,6,12,18,23].map(h => (
+                          <text key={"x"+h} x={x(h)} y={175} textAnchor="middle" fill="#6B7280" fontSize={8}>{h}:00</text>
+                        ))}
+                        <path d={windCF.map((v,i)=>`${i===0?"M":"L"}${x(i)},${20+140-(v/0.7)*140}`).join(" ")} stroke="#3b82f6" strokeWidth={2} fill="none"/>
+                        {windCF.map((v,i) => <circle key={"w"+i} cx={x(i)} cy={20+140-(v/0.7)*140} r={2} fill="#3b82f6"/>)}
+                        <path d={solarCF.map((v,i)=>`${i===0?"M":"L"}${x(i)},${20+140-(v/0.7)*140}`).join(" ")} stroke="#eab308" strokeWidth={2} fill="none"/>
+                        {solarCF.map((v,i) => <circle key={"s"+i} cx={x(i)} cy={20+140-(v/0.7)*140} r={2} fill="#eab308"/>)}
+                        <path d={blendedCF.map((v,i)=>`${i===0?"M":"L"}${x(i)},${20+140-(v/0.7)*140}`).join(" ")} stroke="#a855f7" strokeWidth={2.5} fill="none" strokeDasharray="6,3"/>
+                      </svg>
+                    </div>
+
+                    {/* Surplus/Deficit Chart */}
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:10, color:"#6B7280", marginBottom:8}}>
+                        Hourly surplus / deficit vs DC load
+                        <span style={{marginLeft:16, color:"#22c55e"}}>■ Surplus (curtail/store)</span>
+                        <span style={{marginLeft:12, color:"#ef4444"}}>■ Deficit (need gas)</span>
+                      </div>
+                      <svg width={W} height={160} style={{display:"block"}}>
+                        {(() => {
+                          const maxDelta = Math.max(Math.max(...surplus), Math.abs(Math.min(...deficit))) * 1.1 || 100;
+                          const yD = (v) => 80 - (v/maxDelta)*60;
+                          const barW = cw/24 - 2;
+                          return (
+                            <>
+                              <line x1={pad.l} y1={80} x2={pad.l+cw} y2={80} stroke="#4B5563" strokeWidth={1}/>
+                              {surplus.map((s,i) => s > 0 && (
+                                <rect key={"s"+i} x={pad.l + (i/24)*cw + 1} y={yD(s)} width={barW} height={80-yD(s)} fill="#22c55e99"/>
+                              ))}
+                              {deficit.map((d,i) => d < 0 && (
+                                <rect key={"d"+i} x={pad.l + (i/24)*cw + 1} y={80} width={barW} height={yD(d)-80} fill="#ef444499"/>
+                              ))}
+                              {[0,6,12,18,23].map(h => (
+                                <text key={"x"+h} x={x(h)} y={155} textAnchor="middle" fill="#6B7280" fontSize={8}>{h}:00</text>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </svg>
+                    </div>
+
+                    {/* Bottom metrics */}
+                    <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12}}>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Avg surplus</div>
+                        <div style={{fontSize:18, color:"#E8E6E1", fontWeight:700}}>{Math.round(avgSurplus)} MW</div>
+                      </div>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Avg deficit</div>
+                        <div style={{fontSize:18, color:"#E8E6E1", fontWeight:700}}>{Math.round(avgDeficit)} MW</div>
+                      </div>
+                      <div style={{background:"#12151C", border:"1px solid #1E2330", borderRadius:4, padding:12}}>
+                        <div style={{fontSize:10, color:"#6B7280", marginBottom:4}}>Hours in deficit</div>
+                        <div style={{fontSize:18, color:"#E8E6E1", fontWeight:700}}>{deficitHrs.length} / 24</div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Methodology */}
+            <div style={PS}>
+              <div style={SL}>METHODOLOGY</div>
+              <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.8}}>
+                <p style={{marginBottom:12}}>
+                  This tool models <b style={{color:"#E8E6E1"}}>yearly-averaged hourly</b> capacity factor profiles for wind and solar resources
+                  in the western Oklahoma / panhandle corridor. Profiles are synthetic approximations calibrated to published empirical data.
+                </p>
+                <p style={{marginBottom:12}}>
+                  <b style={{color:"#E8E6E1"}}>Wind profile:</b> Derived from the diurnal pattern of the U.S. Southern Great Plains low-level jet (LLJ),
+                  where hub-height winds peak overnight (~22:00-04:00 CST) and trough midday (~12:00-15:00 CST).
+                  Default peak CF of 53% based on DOE Plains {"&"} Eastern Clean Line analysis for Oklahoma panhandle.
+                </p>
+                <p style={{marginBottom:12}}>
+                  <b style={{color:"#E8E6E1"}}>Solar profile:</b> Modeled as Gaussian curve centered at 13:00 CST, truncated before 06:00 and after 20:00.
+                  Default peak CF of 25% reflects western Oklahoma GHI of ~5.0-5.5 kWh/m²/day for fixed-tilt PV.
+                </p>
+                <p>
+                  <b style={{color:"#E8E6E1"}}>DC load:</b> Set at 40% of total nameplate capacity as proxy for flat 24/7 data center load.
+                </p>
+              </div>
+            </div>
+          </>)}
 
           {/* ===== THESIS ===== */}
           {tab==="thesis"&&(<>
