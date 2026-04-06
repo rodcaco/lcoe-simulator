@@ -892,7 +892,7 @@ export default function App() {
     <div style={{fontFamily:F.s,background:"#0C0F14",color:"#E8E6E1",minHeight:"100vh",padding:"20px 16px"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
       <div style={{marginBottom:20,borderBottom:"1px solid #1E2330",paddingBottom:12}}>
-        <h1 style={{fontSize:16,fontWeight:700,letterSpacing:"-0.02em",color:"#F0EDE8",margin:0,fontFamily:F.m}}>LCOE SIMULATOR v5</h1>
+        <h1 style={{fontSize:16,fontWeight:700,letterSpacing:"-0.02em",color:"#F0EDE8",margin:0,fontFamily:F.m}}>LCOE SIMULATOR - RODCACO</h1>
         <div style={{fontSize:10,color:"#6B7280",marginTop:3,fontFamily:F.m}}>10 GW campus {"\u00B7"} phased buildout {"\u00B7"} gas-first glide path {"\u00B7"} hedge construction over time</div>
       </div>
 
