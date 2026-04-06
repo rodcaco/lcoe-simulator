@@ -10,52 +10,6 @@ const DEF = {
   solarOM:12, windOM:28, gasOMFixed:18, gasOMVar:3.5, battOM:6, omEsc:0.02,
   wacc:0.08, life:25, solarITC:0.30, windPTC:26, battITC:0.30, loadMW:1000,
 };
-
-const GAS_EQUIP = {
-  hframe: { name:"H-Frame Combined Cycle", short:"H-Frame", unitMW:400, heatRate:5.8, capex:850, startMin:180, voltage:"345kV", color:"#6366f1" },
-  fframe: { name:"F-Frame Combined Cycle", short:"F-Frame", unitMW:200, heatRate:6.2, capex:900, startMin:120, voltage:"138kV", color:"#f97316" },
-  aero:   { name:"Aeroderivative Simple Cycle", short:"Aero", unitMW:50, heatRate:8.8, capex:1100, startMin:10, voltage:"34.5kV", color:"#06b6d4" },
-  recip:  { name:"Reciprocating Engine", short:"Recip", unitMW:20, heatRate:7.8, capex:950, startMin:5, voltage:"13.8kV", color:"#22c55e" },
-};
-const GAS_PRESETS = {
-  baseload: {
-    name: "Baseload Combined Cycle",
-    desc: "3× H-Frame (1,200 MW) — Lowest fuel cost, slow start",
-    equipment: { hframe: 3, fframe: 0, aero: 0, recip: 0 },
-    totalMW: 1200, weightedHR: 5.8, weightedCapex: 850, avgStartup: 180,
-  },
-  flexible: {
-    name: "Flexible Combined Cycle",
-    desc: "6× F-Frame (1,200 MW) — Balanced efficiency & flexibility",
-    equipment: { hframe: 0, fframe: 6, aero: 0, recip: 0 },
-    totalMW: 1200, weightedHR: 6.2, weightedCapex: 900, avgStartup: 120,
-  },
-  peaker: {
-    name: "Fast Peaker Fleet",
-    desc: "24× Aeroderivative (1,200 MW) — 10-min start, higher fuel",
-    equipment: { hframe: 0, fframe: 0, aero: 24, recip: 0 },
-    totalMW: 1200, weightedHR: 8.8, weightedCapex: 1100, avgStartup: 10,
-  },
-  ultraflex: {
-    name: "Ultra-Flexible Recips",
-    desc: "60× Reciprocating (1,200 MW) — 5-min start, most modular",
-    equipment: { hframe: 0, fframe: 0, aero: 0, recip: 60 },
-    totalMW: 1200, weightedHR: 7.8, weightedCapex: 950, avgStartup: 5,
-  },
-  hybrid_ha: {
-    name: "Hybrid: H-Frame + Aero",
-    desc: "2× H-Frame + 8× Aero (1,200 MW) — Efficiency + fast backup",
-    equipment: { hframe: 2, fframe: 0, aero: 8, recip: 0 },
-    totalMW: 1200, weightedHR: 6.5, weightedCapex: 900, avgStartup: 65,
-  },
-  hybrid_fr: {
-    name: "Hybrid: F-Frame + Recip",
-    desc: "4× F-Frame + 20× Recip (1,200 MW) — Flexible + backup-ready",
-    equipment: { hframe: 0, fframe: 4, aero: 0, recip: 20 },
-    totalMW: 1200, weightedHR: 6.7, weightedCapex: 915, avgStartup: 45,
-  },
-};
-
 const SCEN = [
   {id:"sb",label:"Solar + Battery",short:"S+B",color:"#D4A026",sources:["solar","battery"]},
   {id:"wb",label:"Wind + Battery",short:"W+B",color:"#3D7EC7",sources:["wind","battery"]},
@@ -96,7 +50,7 @@ const SCENARIO_INPUTS = {
     inputs: [
       { key:"gasPrice",   label:"Gas Price",    unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
       { key:"heatRate",   label:"Heat Rate",    unit:"MMBtu/MWh",base:6.6,bull:6.0,bear:8.5 },
-      { key:"gasTurbine", label:"Gas Plant",   unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"gasTurbine", label:"GT+HRSG+ST",   unit:"$/kW",  base:550, bull:450, bear:1200 },
       { key:"gasBOP",     label:"Gas BOP",      unit:"$/kW",  base:120, bull:80,  bear:400 },
       { key:"gasPipeline",label:"Gas Lateral",   unit:"$/kW",  base:40,  bull:15,  bear:200 },
       { key:"wacc",       label:"WACC",          unit:"%",     base:0.08,bull:0.06,bear:0.13 },
@@ -125,7 +79,7 @@ const SCENARIO_INPUTS = {
       { key:"solarModule",label:"Solar Module",  unit:"$/kW",  base:450, bull:280, bear:700 },
       { key:"windTSA",    label:"Wind TSA",      unit:"$/kW",  base:750, bull:550, bear:1050 },
       { key:"gasPrice",   label:"Gas Price",     unit:"$/MMBtu",base:3.50,bull:2.00,bear:8.00 },
-      { key:"gasTurbine", label:"Gas Plant",    unit:"$/kW",  base:550, bull:450, bear:1200 },
+      { key:"gasTurbine", label:"GT+HRSG+ST",    unit:"$/kW",  base:550, bull:450, bear:1200 },
       { key:"battCells",  label:"Batt Cells",    unit:"$/kWh", base:150, bull:80,  bear:350 },
       { key:"solarITC",   label:"Solar ITC",      unit:"%",     base:0.30,bull:0.50,bear:0.00 },
       { key:"windPTC",    label:"Wind PTC",       unit:"$/MWh", base:26,  bull:35,  bear:0 },
@@ -135,24 +89,6 @@ const SCENARIO_INPUTS = {
     bearLabel: "All inputs stressed: expensive capex, high gas, no IRA",
   },
 };
-
-
-function computeGasMetrics(gasEquipCounts, totalGasMW) {
-  if (totalGasMW <= 0) return { weightedHeatRate: 6.6, weightedCapex: 550, avgStartup: 60 };
-  let totHR = 0, totCapex = 0, totStart = 0, totMW = 0;
-  Object.entries(gasEquipCounts).forEach(([type, count]) => {
-    if (count > 0 && GAS_EQUIP[type]) {
-      const eq = GAS_EQUIP[type];
-      const mw = count * eq.unitMW;
-      totHR += mw * eq.heatRate;
-      totCapex += mw * eq.capex;
-      totStart += mw * eq.startMin;
-      totMW += mw;
-    }
-  });
-  if (totMW === 0) return { weightedHeatRate: 6.6, weightedCapex: 550, avgStartup: 60, actualMW: 0 };
-  return { weightedHeatRate: totHR/totMW, weightedCapex: totCapex/totMW, avgStartup: totStart/totMW, actualMW: totMW };
-}
 
 function crf(r,n){return r===0?1/n:(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
 
@@ -254,28 +190,18 @@ function dispatch(p, sz, hours=72) {
   }};
 }
 
-function tornadoData(p, gasConfig){
-  // Use gasConfig values for heat rate and gas capex
-  const pWithGas = {...p, heatRate: gasConfig.weightedHR};
+function tornadoData(p){
   const vars=[
-    {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas CapEx",u:"$/kW",r:0.5},
-    {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.25},{key:"wacc",label:"WACC",u:"%",r:0.3},
+    {key:"gasPrice",label:"Gas Price",u:"$/MMBtu",r:0.5},{key:"gasTurbine",label:"Gas Turbine",u:"$/kW",r:0.5},
+    {key:"heatRate",label:"Heat Rate",u:"MMBtu/MWh",r:0.3},{key:"wacc",label:"WACC",u:"%",r:0.5},
     {key:"battCells",label:"Batt Cells",u:"$/kWh",r:0.5},{key:"solarModule",label:"Solar Module",u:"$/kW",r:0.4},
     {key:"windTSA",label:"Wind TSA",u:"$/kW",r:0.4},{key:"solarCF",label:"Solar CF",u:"%",r:0.25},
     {key:"windCF",label:"Wind CF",u:"%",r:0.25},{key:"solarITC",label:"Solar ITC",u:"%",r:1.0},
   ];
   return vars.map(v=>{
-    const base = pWithGas[v.key];
-    const lo={...pWithGas,[v.key]:base*(1-v.r)},hi={...pWithGas,[v.key]:base*(1+v.r)};
+    const lo={...p,[v.key]:p[v.key]*(1-v.r)},hi={...p,[v.key]:p[v.key]*(1+v.r)};
     const loR={},hiR={};
-    SCEN.forEach(s=>{
-      const hasGas = s.sources.includes("gas");
-      // For gas scenarios, use the modified params; for non-gas, use original p
-      const loEff = hasGas ? lo : {...p,[v.key]:p[v.key]*(1-v.r)};
-      const hiEff = hasGas ? hi : {...p,[v.key]:p[v.key]*(1+v.r)};
-      loR[s.id]=computeLCOE(loEff,baseSize(loEff,s.id),s.id);
-      hiR[s.id]=computeLCOE(hiEff,baseSize(hiEff,s.id),s.id);
-    });
+    SCEN.forEach(s=>{loR[s.id]=computeLCOE(lo,baseSize(lo,s.id),s.id);hiR[s.id]=computeLCOE(hi,baseSize(hi,s.id),s.id);});
     return{...v,loVal:lo[v.key],hiVal:hi[v.key],loR,hiR};
   });
 }
@@ -336,504 +262,175 @@ function PChart({profile,p,height=220}){
   );
 }
 
-
-// ============ GAS CONFIG PRESET SELECTOR ============
-function GasPresetPanel({gasPreset, setGasPreset, gasConfig, gasMetrics}) {
-  const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
-  return (
-    <div style={{background:"#12151C",border:"1px solid #1E2330",borderRadius:5,padding:12,marginBottom:8}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-        <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#C24B4B",fontFamily:F.m}}>GAS PLANT CONFIG</span>
-        <span style={{fontSize:10,color:"#E8E6E1",fontFamily:F.m}}>{gasMetrics.actualMW} MW</span>
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
-        {Object.entries(GAS_PRESETS).map(([key, preset]) => (
-          <div key={key} onClick={()=>setGasPreset(key)} style={{
-            padding:"8px 10px", borderRadius:4, cursor:"pointer",
-            background: gasPreset===key ? "rgba(194,75,75,0.15)" : "rgba(255,255,255,0.02)",
-            border: gasPreset===key ? "1px solid #C24B4B" : "1px solid #1E2330",
-          }}>
-            <div style={{fontSize:10,color:gasPreset===key?"#E8E6E1":"#9CA3AF",fontWeight:600,fontFamily:F.m}}>{preset.name}</div>
-            <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginTop:2}}>{preset.desc}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{background:"rgba(0,0,0,0.2)",borderRadius:4,padding:8}}>
-        <div style={{fontSize:8,color:"#6B7280",fontFamily:F.m,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Selected Config Details</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:9,fontFamily:F.m}}>
-          <div><span style={{color:"#6B7280"}}>Heat Rate:</span> <span style={{color:"#E8A838"}}>{gasConfig.weightedHR} MMBtu/MWh</span></div>
-          <div><span style={{color:"#6B7280"}}>Startup:</span> <span style={{color:"#2D8C6F"}}>{gasConfig.avgStartup} min</span></div>
-          <div><span style={{color:"#6B7280"}}>CapEx:</span> <span style={{color:"#9CA3AF"}}>from slider</span></div>
-          <div><span style={{color:"#6B7280"}}>Capacity:</span> <span style={{color:"#E8E6E1"}}>{gasConfig.totalMW} MW</span></div>
-        </div>
-        <div style={{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
-          {Object.entries(gasConfig.equipment).filter(([,c])=>c>0).map(([type,count])=>(
-            <span key={type} style={{fontSize:8,padding:"2px 6px",borderRadius:3,background:equipColors[type]+"22",color:equipColors[type],border:`1px solid ${equipColors[type]}44`}}>
-              {count}× {GAS_EQUIP[type].short}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============ ENHANCED SLD COMPONENT ============
-// Current formula: Amps = MW × 1000 / (√3 × kV × PF)   (PF ≈ 0.9)
-function calcAmps(mw, kv, pf=0.9) {
-  return mw * 1000 / (Math.sqrt(3) * kv * pf);
-}
-
-function SLD({configId, sz, p, gasEquip, gasMetrics}) {
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [showVoltages, setShowVoltages] = useState(true);
-  const [showCurrents, setShowCurrents] = useState(true);
-
+// ============ SLD COMPONENT ============
+function SLD({configId, sz, p}) {
   const L = p.loadMW;
-  const W = 1200, H = 950;
-
+  const W = 740, H = 380;
   const hasSolar = sz.solarMW > 0, hasWind = sz.windMW > 0, hasGas = sz.gasMW > 0, hasBatt = (sz.battMW||0) > 0;
-  const solarMW = sz.solarMW || 0, windMW = sz.windMW || 0, gasMW = sz.gasMW || 0, battMW = sz.battMW || 0, battMWh = sz.battMWh || 0;
-  const totalGenMW = solarMW + windMW + gasMW;
+  const sources = [hasSolar&&"solar", hasWind&&"wind", hasGas&&"gas", hasBatt&&"battery"].filter(Boolean);
+  const n = sources.length;
 
-  // Color scheme by voltage level
-  const COLORS = {
-    bus500: "#ff6b6b", bus345: "#ff6b6b", bus230: "#f0c040", bus138: "#f97316", bus34: "#06b6d4",
-    bus13: "#a78bfa", bus12: "#14ffb4", bus480: "#ff9f43", busDC: "#54a0ff",
-    solar: "#D4A026", wind: "#3D7EC7", gas: "#C24B4B", battery: "#2D8C6F",
-    wire: "#556677", text: "#8899aa", textBright: "#E8E6E1",
-    warning: "#f97316", danger: "#ef4444", ok: "#22c55e",
-  };
-
-  // Standard switchgear ratings (Amps)
-  const RATINGS = { "345kV": 3000, "230kV": 3000, "138kV": 3000, "34.5kV": 2000, "13.8kV": 3000, "12.47kV": 2000, "480V": 4000 };
-
-  const BUS_Y = { hv: 80, mv: 220, dist: 380, dc: 560, load: 720 };
-  const busMargin = 50, busWidth = W - busMargin * 2, busStartX = busMargin;
-
-  // Calculate currents at each level
-  const hvAmps = calcAmps(totalGenMW, 230);
-  const mvAmps = calcAmps(L, 34.5);
-  const distAmps = calcAmps(L, 12.47);
-
-  // Number of feeders needed at each level (target ~1500A max per feeder for safety margin)
-  const numMainXfmrs = Math.max(2, Math.ceil(distAmps / 1500));
-  const numFeeders = Math.max(4, Math.ceil(distAmps / 1200));
-  const ampsPerFeeder = distAmps / numFeeders;
-
-  const Bus = ({x, y, width, color, label, thickness=4, amps, rating}) => {
-    const ampsColor = amps > rating ? COLORS.danger : amps > rating*0.8 ? COLORS.warning : COLORS.ok;
-    return (
-      <g>
-        <line x1={x} y1={y} x2={x+width} y2={y} stroke={color} strokeWidth={thickness} strokeLinecap="round"/>
-        {showVoltages && label && <text x={x-4} y={y+4} fill={color} fontSize={9} fontFamily={F.m} fontWeight={600} textAnchor="end">{label}</text>}
-        {showCurrents && amps && (
-          <g>
-            <text x={x+width+8} y={y-2} fill={ampsColor} fontSize={8} fontFamily={F.m} fontWeight={600}>{Math.round(amps).toLocaleString()}A</text>
-            <text x={x+width+8} y={y+9} fill="#556" fontSize={7} fontFamily={F.m}>(max {rating}A)</text>
-          </g>
-        )}
-      </g>
-    );
-  };
-
-  const Breaker = ({x, y, size=8, id, label, amps}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-size/2} y={y-size/2} width={size} height={size} fill={isHovered?"#ff8080":"#1E2330"} stroke={isHovered?"#ff6b6b":"#E8E6E1"} strokeWidth={1.5} rx={2}/>
-        {isHovered && label && <text x={x+size/2+4} y={y+3} fill="#ff8080" fontSize={7} fontFamily={F.m}>{label}</text>}
-        {isHovered && amps && <text x={x+size/2+4} y={y+12} fill="#889" fontSize={6} fontFamily={F.m}>{Math.round(amps)}A</text>}
-      </g>
-    );
-  };
-
-  const Transformer = ({x, y, label, voltages, id, r=12, mva}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y-5} r={r} fill="none" stroke={isHovered?"#ffd060":"#f0c040"} strokeWidth={1.5}/>
-        <circle cx={x} cy={y+5} r={r} fill="none" stroke={isHovered?"#ffd060":"#f0c040"} strokeWidth={1.5}/>
-        {label && <text x={x+r+6} y={y+3} fill={isHovered?"#ffd060":COLORS.text} fontSize={8} fontFamily={F.m}>{label}</text>}
-        {isHovered && voltages && <text x={x+r+6} y={y+13} fill="#667" fontSize={7} fontFamily={F.m}>{voltages}</text>}
-        {isHovered && mva && <text x={x+r+6} y={y+22} fill="#667" fontSize={7} fontFamily={F.m}>{mva} MVA</text>}
-      </g>
-    );
-  };
-
-  const Generator = ({x, y, label, mw, type, id, voltage}) => {
-    const isHovered = hoveredNode === id;
-    const col = type==="solar"?COLORS.solar:type==="wind"?COLORS.wind:type==="gas"?COLORS.gas:COLORS.battery;
-    const r = 18;
-    const genAmps = voltage ? calcAmps(mw, voltage) : 0;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y} r={r} fill={isHovered?col+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?col:col+"88"} strokeWidth={2}/>
-        <text x={x} y={y-2} textAnchor="middle" fill={col} fontSize={10} fontWeight={700} fontFamily={F.m}>G</text>
-        <text x={x} y={y+8} textAnchor="middle" fill={col+"aa"} fontSize={7} fontFamily={F.m}>{mw}MW</text>
-        <text x={x} y={y+r+10} textAnchor="middle" fill={isHovered?col:COLORS.text} fontSize={7} fontWeight={600} fontFamily={F.m}>{label}</text>
-        {isHovered && voltage && (
-          <g><rect x={x-40} y={y+r+14} width={80} height={22} rx={3} fill="rgba(0,0,0,0.9)" stroke={col+"44"}/>
-          <text x={x} y={y+r+25} textAnchor="middle" fill={col} fontSize={7} fontFamily={F.m}>
-            {voltage}kV → {Math.round(genAmps).toLocaleString()}A
-          </text>
-          <text x={x} y={y+r+33} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>
-            {type==="gas"?"HR: "+p.heatRate+" BTU/kWh":type==="solar"?"CF: "+(p.solarCF*100).toFixed(0)+"%":type==="wind"?"CF: "+(p.windCF*100).toFixed(0)+"%":"RTE: "+(p.batteryRTE*100)+"%"}
-          </text></g>
-        )}
-      </g>
-    );
-  };
-
-  const SolarArray = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-20} y={y-12} width={40} height={24} fill={isHovered?COLORS.solar+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.solar:COLORS.solar+"88"} strokeWidth={2} rx={3}/>
-        <line x1={x-12} y1={y-6} x2={x-12} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x-4} y1={y-6} x2={x-4} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x+4} y1={y-6} x2={x+4} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <line x1={x+12} y1={y-6} x2={x+12} y2={y+6} stroke={COLORS.solar} strokeWidth={1}/>
-        <text x={x} y={y+20} textAnchor="middle" fill={isHovered?COLORS.solar:COLORS.text} fontSize={7} fontFamily={F.m} fontWeight={600}>PV Array</text>
-        <text x={x} y={y+28} textAnchor="middle" fill={COLORS.text} fontSize={6} fontFamily={F.m}>{mw} MW DC</text>
-      </g>
-    );
-  };
-
-  const WindTurbine = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <circle cx={x} cy={y} r={16} fill={isHovered?COLORS.wind+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.wind:COLORS.wind+"88"} strokeWidth={2}/>
-        <circle cx={x} cy={y} r={3} fill={COLORS.wind}/>
-        <line x1={x} y1={y-3} x2={x} y2={y-14} stroke={COLORS.wind} strokeWidth={2}/>
-        <line x1={x} y1={y} x2={x+10} y2={y+8} stroke={COLORS.wind} strokeWidth={2}/>
-        <line x1={x} y1={y} x2={x-10} y2={y+8} stroke={COLORS.wind} strokeWidth={2}/>
-        <text x={x} y={y+26} textAnchor="middle" fill={isHovered?COLORS.wind:COLORS.text} fontSize={7} fontFamily={F.m} fontWeight={600}>Wind</text>
-        <text x={x} y={y+34} textAnchor="middle" fill={COLORS.text} fontSize={6} fontFamily={F.m}>{mw} MW</text>
-      </g>
-    );
-  };
-
-  const BatteryBank = ({x, y, mw, mwh, id}) => {
-    const isHovered = hoveredNode === id;
-    const duration = mw > 0 ? (mwh/mw).toFixed(1) : 0;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-22} y={y-12} width={44} height={24} rx={4} fill={isHovered?COLORS.battery+"22":"rgba(0,0,0,0.3)"} stroke={isHovered?COLORS.battery:COLORS.battery+"88"} strokeWidth={2}/>
-        <rect x={x+22} y={y-5} width={3} height={10} rx={1} fill={COLORS.battery}/>
-        <text x={x} y={y+3} textAnchor="middle" fill={COLORS.battery} fontSize={8} fontWeight={700} fontFamily={F.m}>BESS</text>
-        <text x={x} y={y+22} textAnchor="middle" fill={isHovered?COLORS.battery:COLORS.text} fontSize={7} fontFamily={F.m}>{mw}MW/{duration}hr</text>
-      </g>
-    );
-  };
-
-  const Inverter = ({x, y, label, id, mw}) => {
-    const isHovered = hoveredNode === id;
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-12} y={y-8} width={24} height={16} fill={isHovered?"rgba(255,255,255,0.1)":"rgba(0,0,0,0.3)"} stroke={isHovered?"#E8E6E1":"#9CA3AF"} strokeWidth={1.5} rx={2}/>
-        <text x={x} y={y+3} textAnchor="middle" fill="#E8E6E1" fontSize={6} fontFamily={F.m}>{label||"INV"}</text>
-        {isHovered && mw && <text x={x} y={y+14} textAnchor="middle" fill="#667" fontSize={5} fontFamily={F.m}>{mw}MW</text>}
-      </g>
-    );
-  };
-
-  const DataCenter = ({x, y, mw, id}) => {
-    const isHovered = hoveredNode === id;
-    const dcAmps480 = calcAmps(mw, 0.48);
-    return (
-      <g onMouseEnter={()=>setHoveredNode(id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:"pointer"}}>
-        <rect x={x-50} y={y-20} width={100} height={40} rx={4} fill={isHovered?"rgba(249,115,22,0.15)":"rgba(0,0,0,0.3)"} stroke={isHovered?"#f97316":"#f9731688"} strokeWidth={2}/>
-        <text x={x} y={y-4} textAnchor="middle" fill="#f97316" fontSize={11} fontWeight={700} fontFamily={F.m}>DATA CENTER</text>
-        <text x={x} y={y+10} textAnchor="middle" fill="#f97316aa" fontSize={8} fontFamily={F.m}>{mw} MW Load</text>
-        {isHovered && (
-          <g>
-            <text x={x} y={y+30} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>@ 480V: {Math.round(dcAmps480/1000)}kA (split across PDUs)</text>
-            <text x={x} y={y+40} textAnchor="middle" fill="#667" fontSize={7} fontFamily={F.m}>@ 12V DC per chip: ~mA each</text>
-          </g>
-        )}
-      </g>
-    );
-  };
-
-  const Wire = ({x1, y1, x2, y2, color=COLORS.wire, dashed=false, thick=false}) => (
-    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={thick?2.5:1.5} strokeDasharray={dashed?"4,3":"none"}/>
+  // Standard symbol helpers
+  const gen = (cx, cy, r=14) => (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+      <path d={`M${cx-7},${cy} Q${cx-3.5},${cy-6} ${cx},${cy} Q${cx+3.5},${cy+6} ${cx+7},${cy}`} fill="none" stroke="#E8E6E1" strokeWidth={1.2}/>
+    </g>
+  );
+  const xfmr = (cx, cy, r=10) => (
+    <g>
+      <circle cx={cx-r*0.55} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+      <circle cx={cx+r*0.55} cy={cy} r={r} fill="none" stroke="#E8E6E1" strokeWidth={1.5}/>
+    </g>
+  );
+  const brk = (cx, cy, sz=5) => (
+    <rect x={cx-sz} y={cy-sz} width={sz*2} height={sz*2} fill="#1E2330" stroke="#E8E6E1" strokeWidth={1.2}/>
+  );
+  const bus = (x1, x2, cy, color="#E8E6E1") => (
+    <line x1={x1} x2={x2} y1={cy} y2={cy} stroke={color} strokeWidth={3}/>
+  );
+  const wire = (x1, y1, x2, y2, dash=false) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9CA3AF" strokeWidth={1} strokeDasharray={dash?"3,3":"none"}/>
+  );
+  const lbl = (x, y, text, sz=8, color="#9CA3AF") => (
+    <text x={x} y={y} fill={color} fontSize={sz} fontFamily={F.m} textAnchor="middle">{text}</text>
+  );
+  const invSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-10} y={cy-8} width={20} height={16} fill="none" stroke="#E8E6E1" strokeWidth={1.2} rx={2}/>
+      <text x={cx} y={cy+3} fill="#E8E6E1" fontSize={7} fontFamily={F.m} textAnchor="middle">INV</text>
+    </g>
+  );
+  const pcsSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-10} y={cy-8} width={20} height={16} fill="none" stroke="#2D8C6F" strokeWidth={1.2} rx={2}/>
+      <text x={cx} y={cy+3} fill="#2D8C6F" fontSize={7} fontFamily={F.m} textAnchor="middle">PCS</text>
+    </g>
+  );
+  const battSymbol = (cx, cy) => (
+    <g>
+      <rect x={cx-12} y={cy-8} width={24} height={16} fill="#2D8C6F" fillOpacity={0.15} stroke="#2D8C6F" strokeWidth={1.5} rx={3}/>
+      <line x1={cx-5} y1={cy-4} x2={cx-5} y2={cy+4} stroke="#2D8C6F" strokeWidth={2}/>
+      <line x1={cx} y1={cy-3} x2={cx} y2={cy+3} stroke="#2D8C6F" strokeWidth={1}/>
+      <line x1={cx+5} y1={cy-4} x2={cx+5} y2={cy+4} stroke="#2D8C6F" strokeWidth={2}/>
+    </g>
   );
 
-  const sources = [];
-  let xPos = busStartX + 100;
-  const numSources = [hasSolar, hasWind, hasBatt].filter(Boolean).length;
-  const spacing = numSources > 0 ? (busWidth - 200) / Math.max(numSources, 1) : 0;
-  if (hasSolar) { sources.push({type:"solar", x: xPos}); xPos += spacing; }
-  if (hasWind) { sources.push({type:"wind", x: xPos}); xPos += spacing; }
-  if (hasBatt) { sources.push({type:"battery", x: xPos}); }
+  // Layout: sources spread vertically on left, HV bus center-right, data center far right
+  const hvBusX = 480, hvBusTop = 40, hvBusBot = H - 60;
+  const dcX = 660, dcY = H/2;
+  const sourceSpacing = Math.min(80, (H-80)/Math.max(n,1));
+  const sourceStartY = H/2 - (n-1)*sourceSpacing/2;
 
-  const dcCenterX = W/2;
+  const sourceConfigs = sources.map((src, i) => {
+    const cy = sourceStartY + i * sourceSpacing;
+    const color = src==="solar"?"#D4A026":src==="wind"?"#3D7EC7":src==="gas"?"#C24B4B":"#2D8C6F";
+    const mw = src==="solar"?sz.solarMW:src==="wind"?sz.windMW:src==="gas"?sz.gasMW:(sz.battMW||0);
+    const mvKV = src==="solar"?"34.5 kV":src==="wind"?"34.5 kV":src==="gas"?"13.8 kV":"34.5 kV";
+    return { src, cy, color, mw, mvKV };
+  });
 
   return (
-    <div style={{padding:16, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-        <div>
-          <div style={{fontSize:13, fontWeight:700, color:"#E8E6E1", fontFamily:F.m}}>Single Line Diagram — {configId.toUpperCase()}</div>
-          <div style={{fontSize:10, color:"#6B7280", fontFamily:F.m}}>Current Flow Analysis • {totalGenMW.toLocaleString()} MW generation → {L} MW load</div>
-        </div>
-        <div style={{display:"flex", gap:12}}>
-          <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
-            <input type="checkbox" checked={showVoltages} onChange={()=>setShowVoltages(!showVoltages)} style={{accentColor:"#14ffb4"}}/>
-            Voltages
-          </label>
-          <label style={{display:"flex", alignItems:"center", gap:4, fontSize:9, color:"#889", cursor:"pointer"}}>
-            <input type="checkbox" checked={showCurrents} onChange={()=>setShowCurrents(!showCurrents)} style={{accentColor:"#f97316"}}/>
-            Currents
-          </label>
-        </div>
-      </div>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
+      <defs>
+        <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+          <polygon points="0 0, 6 2, 0 4" fill="#9CA3AF"/>
+        </marker>
+      </defs>
 
-      {/* Current Funnel Summary */}
-      <div style={{background:"rgba(0,0,0,0.3)", borderRadius:6, padding:10, marginBottom:12, border:"1px solid rgba(255,255,255,0.05)"}}>
-        <div style={{fontSize:9, fontWeight:700, color:"#889", marginBottom:8, textTransform:"uppercase", letterSpacing:1}}>Current Funnel — High Current → Distributed Low Current</div>
-        <div style={{display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", fontSize:9}}>
-          <span style={{color:COLORS.bus230}}>230kV: <b>{Math.round(hvAmps).toLocaleString()}A</b></span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:COLORS.bus34}}>34.5kV: <b>{Math.round(mvAmps).toLocaleString()}A</b></span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:COLORS.bus12}}>12.47kV: <b>{Math.round(distAmps).toLocaleString()}A</b> ({numMainXfmrs} xfmrs)</span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:"#ff9f43"}}>{numFeeders} feeders @ <b>{Math.round(ampsPerFeeder)}A</b> each</span>
-          <span style={{color:"#556"}}>→</span>
-          <span style={{color:"#54a0ff"}}>480V PDUs → 12V DC chips</span>
-        </div>
-      </div>
+      {/* Title */}
+      {lbl(W/2, 18, `SINGLE LINE DIAGRAM`, 10, "#6B7280")}
 
-      <div style={{overflowX:"auto", background:"rgba(0,0,0,0.25)", borderRadius:8, border:"1px solid rgba(255,255,255,0.05)", padding:8}}>
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
-          <defs>
-            <pattern id="sld-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5"/>
-            </pattern>
-          </defs>
-          <rect width={W} height={H} fill="url(#sld-grid)"/>
+      {/* HV Bus (vertical) */}
+      <line x1={hvBusX} y1={hvBusTop} x2={hvBusX} y2={hvBusBot} stroke="#E8A838" strokeWidth={4}/>
+      {lbl(hvBusX, hvBusTop-6, "HV BUS", 8, "#E8A838")}
+      {lbl(hvBusX, hvBusTop+14, configId==="gu"?"13.8 kV":"138 kV", 7, "#E8A838")}
 
-          <text x={W/2} y={24} textAnchor="middle" fill="#445" fontSize={10} fontFamily={F.m} letterSpacing={2}>
-            HYBRID POWER PLANT — {L} MW LOAD — CURRENT FLOW ANALYSIS
-          </text>
+      {/* Each source branch */}
+      {sourceConfigs.map(({ src, cy, color, mw, mvKV }, idx) => {
+        const genX = 40, invX = 120, mvBusX = 200, xfmrX = 310, brkX = 400;
 
-          {/* ====== GENERATION TIER ====== */}
-          <text x={busStartX} y={BUS_Y.hv-22} fill="#556" fontSize={8} fontFamily={F.m}>GENERATION & COLLECTION</text>
-
-          {/* 230kV HV BUS */}
-          <Bus x={busStartX} y={BUS_Y.hv} width={busWidth} color={COLORS.bus230} label="230kV" thickness={5} amps={hvAmps} rating={RATINGS["230kV"]}/>
-
-          {/* 34.5kV COLLECTION BUS */}
-          <Bus x={busStartX} y={BUS_Y.mv} width={busWidth} color={COLORS.bus34} label="34.5kV" thickness={4} amps={mvAmps} rating={RATINGS["34.5kV"]}/>
-
-          {/* Tie transformer HV to MV */}
-          <Wire x1={busStartX + busWidth*0.85} y1={BUS_Y.hv} x2={busStartX + busWidth*0.85} y2={BUS_Y.hv+18} color={COLORS.bus230} thick/>
-          <Breaker x={busStartX + busWidth*0.85} y={BUS_Y.hv+12} id="cb-tie-hv" label="TIE CB" amps={hvAmps}/>
-          <Transformer x={busStartX + busWidth*0.85} y={BUS_Y.hv+46} label="TIE" voltages="230-34.5kV" id="xfmr-tie" mva={Math.round(totalGenMW*1.1)}/>
-          <Wire x1={busStartX + busWidth*0.85} y1={BUS_Y.hv+60} x2={busStartX + busWidth*0.85} y2={BUS_Y.mv} color={COLORS.bus34} thick/>
-
-          {/* SOLAR BRANCH */}
-          {hasSolar && (() => {
-            const sx = sources.find(s=>s.type==="solar")?.x || busStartX+120;
-            const arrayY = BUS_Y.mv - 85;
-            const solarAmps = calcAmps(solarMW, 34.5);
-            return (
+        return (
+          <g key={src}>
+            {/* Source icon + label */}
+            {src === "solar" && (
               <g>
-                <SolarArray x={sx} y={arrayY} mw={solarMW} id="solar-array"/>
-                <Wire x1={sx} y1={arrayY+14} x2={sx} y2={arrayY+32}/>
-                <Inverter x={sx} y={arrayY+40} label="INV" id="solar-inv" mw={solarMW}/>
-                <Wire x1={sx} y1={arrayY+48} x2={sx} y2={BUS_Y.mv-24}/>
-                <Transformer x={sx} y={BUS_Y.mv-14} label="SSU" voltages="0.6-34.5kV" id="xfmr-solar" r={9}/>
-                <Breaker x={sx} y={BUS_Y.mv-2} id="cb-solar" label="SOLAR" amps={solarAmps}/>
+                <rect x={genX-14} y={cy-12} width={28} height={24} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={1.2} rx={2}/>
+                <text x={genX} y={cy-1} fill={color} fontSize={10} fontFamily={F.m} textAnchor="middle">PV</text>
+                <text x={genX} y={cy+10} fill={color} fontSize={6} fontFamily={F.m} textAnchor="middle">{mw}MW</text>
+                {wire(genX+14, cy, invX-10, cy)}
+                {invSymbol(invX, cy)}
+                {wire(invX+10, cy, mvBusX-20, cy)}
+                {lbl(invX, cy-14, "DC/AC", 6)}
               </g>
-            );
-          })()}
-
-          {/* WIND BRANCH */}
-          {hasWind && (() => {
-            const wx = sources.find(s=>s.type==="wind")?.x || busStartX+300;
-            const turbY = BUS_Y.mv - 85;
-            const windAmps = calcAmps(windMW, 34.5);
-            return (
+            )}
+            {src === "wind" && (
               <g>
-                <WindTurbine x={wx} y={turbY} mw={windMW} id="wind-turbine"/>
-                <Wire x1={wx} y1={turbY+18} x2={wx} y2={BUS_Y.mv-24}/>
-                <Transformer x={wx} y={BUS_Y.mv-14} label="PAD" voltages="0.69-34.5kV" id="xfmr-wind" r={9}/>
-                <Breaker x={wx} y={BUS_Y.mv-2} id="cb-wind" label="WIND" amps={windAmps}/>
+                {gen(genX, cy)}
+                <text x={genX} y={cy+26} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">WTG {mw}MW</text>
+                {wire(genX+14, cy, mvBusX-20, cy)}
               </g>
-            );
-          })()}
-
-          {/* BATTERY BRANCH */}
-          {hasBatt && (() => {
-            const bx = sources.find(s=>s.type==="battery")?.x || busStartX+480;
-            const battY = BUS_Y.mv - 80;
-            const battAmps = calcAmps(battMW, 34.5);
-            return (
+            )}
+            {src === "gas" && (
               <g>
-                <BatteryBank x={bx} y={battY} mw={battMW} mwh={battMWh} id="battery"/>
-                <Wire x1={bx} y1={battY+14} x2={bx} y2={battY+30} color={COLORS.battery}/>
-                <Inverter x={bx} y={battY+38} label="PCS" id="batt-pcs" mw={battMW}/>
-                <Wire x1={bx} y1={battY+46} x2={bx} y2={BUS_Y.mv-24}/>
-                <Transformer x={bx} y={BUS_Y.mv-14} label="BESS" voltages="0.48-34.5kV" id="xfmr-batt" r={9}/>
-                <Breaker x={bx} y={BUS_Y.mv-2} id="cb-batt" label="BESS" amps={battAmps}/>
+                {gen(genX, cy)}
+                <text x={genX} y={cy+26} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">GT/ST {mw}MW</text>
+                {wire(genX+14, cy, mvBusX-20, cy)}
+                {lbl((genX+14+mvBusX-20)/2, cy-10, "13.8 kV", 6)}
               </g>
-            );
-          })()}
-
-          {/* GAS GENERATION */}
-          {hasGas && gasEquip && (() => {
-            const hCount = gasEquip.hframe || 0;
-            const fCount = gasEquip.fframe || 0;
-            const aCount = gasEquip.aero || 0;
-            const rCount = gasEquip.recip || 0;
-            const equipColors = {hframe:"#6366f1", fframe:"#f97316", aero:"#06b6d4", recip:"#22c55e"};
-            const gasX = busStartX + busWidth * 0.6;
-
-            // Calculate gas contribution to 34.5kV
-            const gasToMV = gasMW;
-            const gasAmpsAtMV = calcAmps(gasToMV, 34.5);
-
-            return (
+            )}
+            {src === "battery" && (
               <g>
-                {/* Gas generation summary */}
-                <rect x={gasX-80} y={BUS_Y.mv-90} width={160} height={70} rx={4} fill="rgba(194,75,75,0.1)" stroke="#C24B4B44"/>
-                <text x={gasX} y={BUS_Y.mv-76} textAnchor="middle" fill={COLORS.gas} fontSize={9} fontWeight={700} fontFamily={F.m}>GAS GENERATION</text>
-                <text x={gasX} y={BUS_Y.mv-64} textAnchor="middle" fill="#889" fontSize={7} fontFamily={F.m}>{gasMW} MW Total</text>
-
-                {hCount > 0 && <text x={gasX} y={BUS_Y.mv-52} textAnchor="middle" fill={equipColors.hframe} fontSize={7} fontFamily={F.m}>{hCount}× H-Frame (400MW @ 18kV → 345kV)</text>}
-                {fCount > 0 && <text x={gasX} y={BUS_Y.mv-42} textAnchor="middle" fill={equipColors.fframe} fontSize={7} fontFamily={F.m}>{fCount}× F-Frame (200MW @ 13.8kV → 138kV)</text>}
-                {aCount > 0 && <text x={gasX} y={BUS_Y.mv-32} textAnchor="middle" fill={equipColors.aero} fontSize={7} fontFamily={F.m}>{aCount}× Aero (50MW @ 13.8kV)</text>}
-                {rCount > 0 && <text x={gasX} y={BUS_Y.mv-22} textAnchor="middle" fill={equipColors.recip} fontSize={7} fontFamily={F.m}>{rCount}× Recip (20MW @ 480V-4.16kV)</text>}
-
-                <Wire x1={gasX} y1={BUS_Y.mv-20} x2={gasX} y2={BUS_Y.mv-2} color={COLORS.gas}/>
-                <Breaker x={gasX} y={BUS_Y.mv-2} id="cb-gas" label="GAS MAIN" amps={gasAmpsAtMV}/>
+                {battSymbol(genX, cy)}
+                <text x={genX} y={cy+20} fill={color} fontSize={7} fontFamily={F.m} textAnchor="middle">BESS {mw}MW</text>
+                <text x={genX} y={cy+28} fill={color} fontSize={6} fontFamily={F.m} textAnchor="middle">{((sz.battMWh||0)/1000).toFixed(1)}GWh</text>
+                {wire(genX+12, cy, invX-10, cy)}
+                {pcsSymbol(invX, cy)}
+                {wire(invX+10, cy, mvBusX-20, cy)}
               </g>
-            );
-          })()}
+            )}
 
-          {/* ====== DISTRIBUTION TIER ====== */}
-          <text x={busStartX} y={BUS_Y.dist-22} fill="#556" fontSize={8} fontFamily={F.m}>DISTRIBUTION — {numMainXfmrs} MAIN TRANSFORMERS</text>
+            {/* MV Collection Bus (short horizontal) */}
+            {bus(mvBusX-20, mvBusX+20, cy, color+"AA")}
+            {lbl(mvBusX, cy+16, mvKV, 6, color)}
 
-          {/* 12.47kV DISTRIBUTION BUS */}
-          <Bus x={busStartX+100} y={BUS_Y.dist} width={busWidth-200} color={COLORS.bus12} label="12.47kV" thickness={4} amps={distAmps} rating={RATINGS["12.47kV"]}/>
+            {/* Step-up Xfmr */}
+            {wire(mvBusX+20, cy, xfmrX-12, cy)}
+            {xfmr(xfmrX, cy)}
+            {lbl(xfmrX, cy-16, src==="gas"?"GSU":"SSU", 6)}
 
-          {/* Multiple Main Transformers from 34.5kV to 12.47kV */}
-          {Array.from({length: numMainXfmrs}).map((_, i) => {
-            const xfmrX = busStartX + 150 + i * ((busWidth-300) / (numMainXfmrs-1 || 1));
-            const xfmrMVA = Math.round(L / numMainXfmrs * 1.25);
-            const xfmrAmps = distAmps / numMainXfmrs;
-            return (
-              <g key={"main-xfmr-"+i}>
-                <Wire x1={xfmrX} y1={BUS_Y.mv} x2={xfmrX} y2={BUS_Y.mv+16} color={COLORS.bus34}/>
-                <Breaker x={xfmrX} y={BUS_Y.mv+10} id={"cb-main-hv-"+i} label={"MAIN "+(i+1)} amps={xfmrAmps}/>
-                <Transformer x={xfmrX} y={(BUS_Y.mv+BUS_Y.dist)/2} label={"MAIN "+(i+1)} voltages="34.5-12.47kV" id={"xfmr-main-"+i} mva={xfmrMVA}/>
-                <Wire x1={xfmrX} y1={(BUS_Y.mv+BUS_Y.dist)/2+14} x2={xfmrX} y2={BUS_Y.dist-10} color={COLORS.bus12}/>
-                <Breaker x={xfmrX} y={BUS_Y.dist-6} id={"cb-main-lv-"+i} label="LV" amps={xfmrAmps}/>
-              </g>
-            );
-          })}
+            {/* Breaker */}
+            {wire(xfmrX+12, cy, brkX-5, cy)}
+            {brk(brkX, cy)}
 
-          {/* ====== DATA CENTER TIER ====== */}
-          <text x={busStartX} y={BUS_Y.dc-22} fill="#556" fontSize={8} fontFamily={F.m}>DATA CENTER DISTRIBUTION — {numFeeders} FEEDERS @ {Math.round(ampsPerFeeder)}A EACH</text>
+            {/* Connect to HV bus */}
+            {wire(brkX+5, cy, hvBusX, cy)}
 
-          {/* 480V BUS (conceptual) */}
-          <Bus x={busStartX+150} y={BUS_Y.dc} width={busWidth-300} color={"#ff9f43"} label="480V" thickness={3}/>
+            {/* Breaker label */}
+            {lbl(brkX, cy-10, "CB", 6)}
+          </g>
+        );
+      })}
 
-          {/* Feeders from 12.47kV to 480V */}
-          {Array.from({length: Math.min(numFeeders, 8)}).map((_, i) => {
-            const feederX = busStartX + 180 + i * ((busWidth-360) / (Math.min(numFeeders, 8)-1 || 1));
-            return (
-              <g key={"feeder-"+i}>
-                <Wire x1={feederX} y1={BUS_Y.dist} x2={feederX} y2={BUS_Y.dist+14} color={COLORS.bus12}/>
-                <Breaker x={feederX} y={BUS_Y.dist+10} size={6} id={"cb-feeder-"+i} label={"F"+(i+1)} amps={ampsPerFeeder}/>
-                <Transformer x={feederX} y={(BUS_Y.dist+BUS_Y.dc)/2} label="" voltages="12.47kV-480V" id={"xfmr-feeder-"+i} r={8}/>
-                <Wire x1={feederX} y1={(BUS_Y.dist+BUS_Y.dc)/2+10} x2={feederX} y2={BUS_Y.dc} color={"#ff9f43"}/>
-              </g>
-            );
-          })}
-          {numFeeders > 8 && (
-            <text x={W/2} y={(BUS_Y.dist+BUS_Y.dc)/2+24} textAnchor="middle" fill="#667" fontSize={8} fontFamily={F.m}>
-              (+{numFeeders-8} more feeders not shown)
-            </text>
-          )}
+      {/* HV Bus to Data Center */}
+      {wire(hvBusX, dcY, 540, dcY)}
+      {xfmr(555, dcY, 12)}
+      {lbl(555, dcY-18, "STEP-DOWN", 6)}
+      {wire(568, dcY, 600, dcY)}
+      {brk(610, dcY, 6)}
+      {lbl(610, dcY-12, "MAIN BKR", 6)}
+      {wire(616, dcY, dcX-20, dcY)}
 
-          {/* PDU Level */}
-          <text x={busStartX} y={BUS_Y.load-22} fill="#556" fontSize={8} fontFamily={F.m}>PDU & RACK DISTRIBUTION — Final current split to servers</text>
+      {/* Data Center Load */}
+      <rect x={dcX-20} y={dcY-25} width={60} height={50} fill="#1E2330" stroke="#E8E6E1" strokeWidth={1.5} rx={4}/>
+      <text x={dcX+10} y={dcY-6} fill="#E8E6E1" fontSize={8} fontFamily={F.m} textAnchor="middle">DATA</text>
+      <text x={dcX+10} y={dcY+4} fill="#E8E6E1" fontSize={8} fontFamily={F.m} textAnchor="middle">CENTER</text>
+      <text x={dcX+10} y={dcY+16} fill="#6B7280" fontSize={7} fontFamily={F.m} textAnchor="middle">{L} MW</text>
 
-          {/* PDUs */}
-          {Array.from({length: 5}).map((_, i) => {
-            const pduX = busStartX + 200 + i * 160;
-            const pduMW = L / 5;
-            const pduAmps = calcAmps(pduMW, 0.48);
-            return (
-              <g key={"pdu-"+i}>
-                <Wire x1={pduX} y1={BUS_Y.dc} x2={pduX} y2={BUS_Y.dc+20} color={"#ff9f43"}/>
-                <rect x={pduX-20} y={BUS_Y.dc+22} width={40} height={20} rx={3} fill="rgba(0,0,0,0.4)" stroke="#54a0ff88" strokeWidth={1}/>
-                <text x={pduX} y={BUS_Y.dc+35} textAnchor="middle" fill="#54a0ff" fontSize={7} fontWeight={600} fontFamily={F.m}>PDU-{i+1}</text>
-                <text x={pduX} y={BUS_Y.dc+50} textAnchor="middle" fill="#667" fontSize={6} fontFamily={F.m}>{Math.round(pduAmps)}A</text>
-                <Wire x1={pduX} y1={BUS_Y.dc+42} x2={pduX} y2={BUS_Y.load-30} color="#54a0ff" dashed/>
-              </g>
-            );
-          })}
-
-          <DataCenter x={dcCenterX} y={BUS_Y.load} mw={L} id="dc-load"/>
-
-          {/* Current flow arrows annotation */}
-          <text x={W-80} y={BUS_Y.hv+40} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">↓ Current increases</text>
-          <text x={W-80} y={BUS_Y.hv+50} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">as voltage drops</text>
-          <text x={W-80} y={BUS_Y.dist+40} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">↓ But splitting into</text>
-          <text x={W-80} y={BUS_Y.dist+50} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">parallel paths keeps</text>
-          <text x={W-80} y={BUS_Y.dist+60} fill="#445" fontSize={8} fontFamily={F.m} textAnchor="end">each circuit in ratings</text>
-
-          {!hasSolar && !hasWind && !hasGas && !hasBatt && (
-            <text x={W/2} y={H/2} textAnchor="middle" fill="#445" fontSize={12} fontFamily={F.m}>
-              Configure generation sources to see single line diagram
-            </text>
-          )}
-        </svg>
-      </div>
-
-      {/* Enhanced Legend */}
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginTop:12}}>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Symbols</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:"#778"}}><span style={{color:"#E8E6E1"}}>G</span> Generator</span>
-            <span style={{color:"#778"}}><span style={{color:"#f0c040"}}>OO</span> Transformer</span>
-            <span style={{color:"#778"}}><span style={{color:"#E8E6E1"}}>[]</span> Breaker</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Voltage Levels</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:COLORS.bus230}}>━ 230kV Transmission</span>
-            <span style={{color:COLORS.bus34}}>━ 34.5kV Collection</span>
-            <span style={{color:COLORS.bus12}}>━ 12.47kV Distribution</span>
-            <span style={{color:"#ff9f43"}}>━ 480V Building</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Current Ratings</div>
-          <div style={{display:"flex", flexDirection:"column", gap:2, fontSize:8}}>
-            <span style={{color:COLORS.ok}}>● Within Rating</span>
-            <span style={{color:COLORS.warning}}>● Near Limit (80%+)</span>
-            <span style={{color:COLORS.danger}}>● Over Rating</span>
-          </div>
-        </div>
-        <div style={{padding:8, background:"rgba(0,0,0,0.2)", borderRadius:6}}>
-          <div style={{fontSize:8, fontWeight:700, color:"#889", marginBottom:4, textTransform:"uppercase"}}>Formula</div>
-          <div style={{fontSize:8, color:"#778"}}>
-            Amps = MW × 1000 / (√3 × kV × PF)
-          </div>
-          <div style={{fontSize:7, color:"#556", marginTop:2}}>
-            PF ≈ 0.9 typical
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Voltage labels on DC side */}
+      {lbl(590, dcY+20, "MV SWGR", 6)}
+      {lbl(590, dcY+28, "12.47 kV", 6)}
+    </svg>
   );
 }
 
@@ -842,14 +439,6 @@ function SLD({configId, sz, p, gasEquip, gasMetrics}) {
 export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
-  const [tabOrder, setTabOrder] = useState(() => {
-    const saved = localStorage.getItem("lcoe_tabOrder");
-    return saved ? JSON.parse(saved) : ["overview","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
-  });
-  const [draggedTab, setDraggedTab] = useState(null);
-  const handleTabDragStart = (e, t) => { setDraggedTab(t); e.dataTransfer.effectAllowed = "move"; };
-  const handleTabDragOver = (e, t) => { e.preventDefault(); if (draggedTab && draggedTab !== t) { const newOrder = [...tabOrder]; const fromIdx = newOrder.indexOf(draggedTab); const toIdx = newOrder.indexOf(t); newOrder.splice(fromIdx, 1); newOrder.splice(toIdx, 0, draggedTab); setTabOrder(newOrder); localStorage.setItem("lcoe_tabOrder", JSON.stringify(newOrder)); } };
-  const handleTabDragEnd = () => setDraggedTab(null);
   const [torCfg, setTorCfg] = useState("gu");
   const [profCfg, setProfCfg] = useState("swgb");
   const [sldCfg, setSldCfg] = useState("swgb");
@@ -859,10 +448,6 @@ export default function App() {
     SCEN.forEach(s => { o[s.id] = { dSolar: 0, dWind: 0, dGas: 0, dBattMW: 0, dBattMWh: 0 }; });
     return o;
   });
-  const [gasPreset, setGasPreset] = useState("hybrid_ha");
-  const gasConfig = GAS_PRESETS[gasPreset] || GAS_PRESETS.hybrid_ha;
-  const gasEquip = gasConfig.equipment;
-  const gasMetrics = { weightedHeatRate: gasConfig.weightedHR, weightedCapex: gasConfig.weightedCapex, avgStartup: gasConfig.avgStartup, actualMW: gasConfig.totalMW };
   const update = useCallback((k,v) => setP(prev=>({...prev,[k]:v})), []);
   const updateRel = useCallback((cfgId, key, val) => {
     setRelAdj(prev => ({ ...prev, [cfgId]: { ...prev[cfgId], [key]: val } }));
@@ -940,13 +525,11 @@ export default function App() {
   }, [p, phases]);
 
   // Compute base sizes + adjusted sizes + LCOE + dispatch
-  // Use gasConfig values for gas-related scenarios
   const computed = useMemo(() => {
     const out = {};
     SCEN.forEach(s => {
       const bs = baseSize(p, s.id);
       const adj = relAdj[s.id];
-      const hasGas = s.sources.includes("gas");
       const sz = {
         solarMW: Math.max(0, bs.solarMW + adj.dSolar),
         windMW: Math.max(0, bs.windMW + adj.dWind),
@@ -955,16 +538,14 @@ export default function App() {
         battMWh: Math.max(0, (bs.battMWh||0) + adj.dBattMWh),
         upsMWh: bs.upsMWh || 0,
       };
-      // Override heat rate and gas capex with preset values for gas scenarios
-      const pEff = hasGas ? {...p, heatRate: gasConfig.weightedHR} : p;
-      const lcoe = computeLCOE(pEff, sz, s.id);
+      const lcoe = computeLCOE(p, sz, s.id);
       const disp = dispatch(p, sz);
       out[s.id] = { base: bs, sz, lcoe, disp };
     });
     return out;
-  }, [p, relAdj, gasConfig]);
+  }, [p, relAdj]);
 
-  const tornado = useMemo(() => tornadoData(p, gasConfig), [p, gasConfig]);
+  const tornado = useMemo(() => tornadoData(p), [p]);
   // Per-config scenario blend: 0 = bear, 0.5 = base, 1.0 = bull
   // And per-input overrides
   const [scenCfg, setScenCfg] = useState("gu");
@@ -1055,12 +636,11 @@ export default function App() {
             {key:"windEPC",label:"EPC+Soft",min:50,max:350,step:10,unit:"$/kW"},
           ]}/>
           <CxP title="GAS CC" color="#C24B4B" p={p} update={update} items={[
-            {key:"gasTurbine",label:"Gas Plant",min:300,max:2000,step:25,unit:"$/kW"},
+            {key:"gasTurbine",label:"GT+HRSG+ST",min:300,max:2000,step:25,unit:"$/kW"},
             {key:"gasBOP",label:"BOP (all)",min:50,max:800,step:10,unit:"$/kW"},
             {key:"gasPipeline",label:"Gas Lateral",min:10,max:400,step:10,unit:"$/kW"},
             {key:"gasEPC",label:"EPC+Permit",min:30,max:500,step:10,unit:"$/kW"},
           ]}/>
-          <GasPresetPanel gasPreset={gasPreset} setGasPreset={setGasPreset} gasConfig={gasConfig} gasMetrics={gasMetrics}/>
           <CxP title="BATTERY" color="#2D8C6F" p={p} update={update} items={[
             {key:"battCells",label:"LFP Cells",min:50,max:400,step:10,unit:"$/kWh"},
             {key:"battBOP",label:"PCS/BOP",min:30,max:200,step:5,unit:"$/kWh"},
@@ -1082,8 +662,8 @@ export default function App() {
         {/* RIGHT */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-            {tabOrder.map(t=>(
-              <button key={t} draggable style={{...TS(tab===t), cursor: draggedTab ? "grabbing" : "grab", opacity: draggedTab === t ? 0.5 : 1}} onClick={()=>setTab(t)} onDragStart={(e)=>handleTabDragStart(e,t)} onDragOver={(e)=>handleTabDragOver(e,t)} onDragEnd={handleTabDragEnd}>{t.toUpperCase()}</button>
+            {["overview","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"].map(t=>(
+              <button key={t} style={TS(tab===t)} onClick={()=>setTab(t)}>{t.toUpperCase()}</button>
             ))}
           </div>
 
@@ -1433,9 +1013,20 @@ export default function App() {
             <div style={{display:"flex",gap:4,marginBottom:4}}>
               {SCEN.map(s=>(<button key={s.id} style={{...TS(sldCfg===s.id),borderColor:sldCfg===s.id?s.color+"80":"transparent"}} onClick={()=>setSldCfg(s.id)}>{s.short}</button>))}
             </div>
-            <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p} gasEquip={gasEquip} gasMetrics={gasMetrics}/>
+            <div style={PS}>
+              <div style={SL}>SINGLE LINE DIAGRAM {"\u2014"} {SCEN.find(s=>s.id===sldCfg)?.short}</div>
+              <div style={{fontSize:8,color:"#4B5563",fontFamily:F.m,marginBottom:6}}>Generator {"\u2192"} MV collection {"\u2192"} step-up xfmr {"\u2192"} HV bus {"\u2192"} step-down {"\u2192"} DC switchgear. CB = circuit breaker, GSU/SSU = gen/station step-up, PCS = power conversion system, INV = inverter.</div>
+              <SLD configId={sldCfg} sz={computed[sldCfg].sz} p={p}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {SCEN.filter(s=>s.id!==sldCfg).map(s=>(
+                <div key={s.id} style={{background:"#0C0F14",borderRadius:4,padding:8}}>
+                  <div style={{fontSize:9,fontFamily:F.m,color:s.color,fontWeight:600,marginBottom:2}}>{s.short}</div>
+                  <SLD configId={s.id} sz={computed[s.id].sz} p={p}/>
+                </div>
+              ))}
+            </div>
           </>)}
-
 
           {/* ===== TORNADO ===== */}
           {tab==="tornado"&&(<>
@@ -1444,7 +1035,6 @@ export default function App() {
             </div>
             <div style={PS}>
               <div style={SL}>TORNADO SENSITIVITY {"\u2014"} {SCEN.find(s=>s.id===torCfg)?.short}</div>
-              <div style={{fontSize:9,color:"#6B7280",fontFamily:F.m,marginBottom:10}}>Shows how ± changes in each input affect LCOE. <span style={{color:"#2D8C6F"}}>Green = lower cost</span>, <span style={{color:"#C24B4B"}}>Red = higher cost</span>. Sorted by impact.</div>
               {(()=>{const bL=results[torCfg].lcoe;const sc=SCEN.find(s=>s.id===torCfg);
                 const sorted=tornado.map(v=>{const lo=v.loR[torCfg].lcoe,hi=v.hiR[torCfg].lcoe;return{...v,lo,hi,imp:Math.abs(hi-lo)};}).sort((a,b)=>b.imp-a.imp);
                 const mI=Math.max(...sorted.map(s=>s.imp));
@@ -1457,7 +1047,6 @@ export default function App() {
                       <div style={{position:"absolute",left:"50%",top:0,width:1,height:18,background:"#2A3040"}}/>
                       <div style={{position:"absolute",left:mn<0?`${50+mn*sc2/2}%`:"50%",width:`${Math.abs(mn)*sc2/2}%`,height:18,background:mn<0?"#2D8C6F80":"#C24B4B80",borderRadius:2,top:0}}/>
                       <div style={{position:"absolute",left:mx<0?`${50+mx*sc2/2}%`:"50%",width:`${Math.abs(mx)*sc2/2}%`,height:18,background:mx>0?"#C24B4B80":"#2D8C6F80",borderRadius:2,top:0}}/>
-                      <div style={{position:"absolute",left:"50%",top:0,transform:"translateX(-50%)",height:18,display:"flex",alignItems:"center",fontSize:8,fontFamily:F.m,color:"#E8E6E1",fontWeight:600,pointerEvents:"none"}}>${bL.toFixed(1)}</div>
                     </div>
                     <div style={{width:45,fontSize:8,fontFamily:F.m,color:"#6B7280",flexShrink:0}}>{fV(v.hiVal,v.u)}</div>
                     <div style={{width:55,fontSize:9,fontFamily:F.m,color:sc.color,textAlign:"right",flexShrink:0,fontWeight:600}}>{"\u00B1"}${(v.imp/2).toFixed(1)}</div>
