@@ -685,21 +685,21 @@ export default function App() {
   const [tab, setTab] = useState("overview");
   const [tabOrder, setTabOrder] = useState(() => {
     const defaultOrder = ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","sizing"];
-    const saved = localStorage.getItem("lcoe_tabOrder");
+    const saved = localStorage.getItem("lcoe_tabOrder_v2");
     if (!saved) return defaultOrder;
     const parsed = JSON.parse(saved);
     // Ensure new tabs are added if missing from saved order
     const missing = defaultOrder.filter(t => !parsed.includes(t));
     if (missing.length > 0) {
       const updated = [...parsed.slice(0,1), ...missing, ...parsed.slice(1)];
-      localStorage.setItem("lcoe_tabOrder", JSON.stringify(updated));
+      localStorage.setItem("lcoe_tabOrder_v2", JSON.stringify(updated));
       return updated;
     }
     return parsed;
   });
   const [draggedTab, setDraggedTab] = useState(null);
   const handleTabDragStart = (e, t) => { setDraggedTab(t); e.dataTransfer.effectAllowed = "move"; };
-  const handleTabDragOver = (e, t) => { e.preventDefault(); if (draggedTab && draggedTab !== t) { const newOrder = [...tabOrder]; const fromIdx = newOrder.indexOf(draggedTab); const toIdx = newOrder.indexOf(t); newOrder.splice(fromIdx, 1); newOrder.splice(toIdx, 0, draggedTab); setTabOrder(newOrder); localStorage.setItem("lcoe_tabOrder", JSON.stringify(newOrder)); } };
+  const handleTabDragOver = (e, t) => { e.preventDefault(); if (draggedTab && draggedTab !== t) { const newOrder = [...tabOrder]; const fromIdx = newOrder.indexOf(draggedTab); const toIdx = newOrder.indexOf(t); newOrder.splice(fromIdx, 1); newOrder.splice(toIdx, 0, draggedTab); setTabOrder(newOrder); localStorage.setItem("lcoe_tabOrder_v2", JSON.stringify(newOrder)); } };
   const handleTabDragEnd = () => setDraggedTab(null);
   const [torCfg, setTorCfg] = useState("gu");
   const [profCfg, setProfCfg] = useState("swgb");
