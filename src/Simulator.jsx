@@ -1911,6 +1911,156 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* ===== MATHEMATICAL FOUNDATION ===== */}
+            <div style={{...PS, background:"linear-gradient(135deg, #0f1115 0%, #1a1d25 100%)", border:"1px solid #3b82f644"}}>
+              <div style={{...SL, color:"#3b82f6"}}>MATHEMATICAL FOUNDATION</div>
+              <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginBottom:16, lineHeight:1.7}}>
+                The hybrid advantage emerges from fundamental mathematics of <b style={{color:"#E8E6E1"}}>energy</b> vs <b style={{color:"#E8E6E1"}}>capacity</b>.
+              </div>
+            </div>
+
+            {/* The Two Constraints */}
+            <div style={PS}>
+              <div style={SL}>THE TWO CONSTRAINTS THAT GOVERN POWER SYSTEMS</div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:20}}>
+                <div style={{background:"#1a1d25", borderRadius:8, padding:16, border:"1px solid #eab30833"}}>
+                  <div style={{fontSize:12, color:"#eab308", fontFamily:F.m, fontWeight:700, marginBottom:12}}>1. ENERGY BALANCE</div>
+                  <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", background:"#0f1115", padding:12, borderRadius:6, marginBottom:12}}>
+                    Sum(Generation) = Sum(Load) + Losses
+                  </div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    Total energy generated must equal total energy consumed.
+                    <br/><br/>
+                    Solar at 27% CF: 2,365 MWh/MW/year.<br/>
+                    Gas at 90% CF: 7,884 MWh/MW/year.<br/>
+                    <br/>
+                    <span style={{color:"#E8E6E1"}}>Renewables excel here</span> - zero fuel cost.
+                  </div>
+                </div>
+                <div style={{background:"#1a1d25", borderRadius:8, padding:16, border:"1px solid #ef444433"}}>
+                  <div style={{fontSize:12, color:"#ef4444", fontFamily:F.m, fontWeight:700, marginBottom:12}}>2. CAPACITY ADEQUACY</div>
+                  <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", background:"#0f1115", padding:12, borderRadius:6, marginBottom:12}}>
+                    At all times: Available {">"} Load
+                  </div>
+                  <div style={{fontSize:9, color:"#9CA3AF", fontFamily:F.m, lineHeight:1.7}}>
+                    At <b>every instant</b>, available generation must meet load.
+                    This is the <b style={{color:"#ef4444"}}>binding constraint</b>.
+                    <br/><br/>
+                    Solar: ~10-15% capacity credit.<br/>
+                    Gas: ~95-100% capacity credit.<br/>
+                    <br/>
+                    <span style={{color:"#E8E6E1"}}>Gas excels here</span> - dispatchable.
+                  </div>
+                </div>
+              </div>
+              <div style={{marginTop:16, padding:14, background:"#E8A83812", borderRadius:8, border:"1px solid #E8A83833"}}>
+                <div style={{fontSize:10, color:"#E8E6E1", fontFamily:F.m, lineHeight:1.7}}>
+                  <b style={{color:"#E8A838"}}>Insight:</b> These constraints need <i>different</i> resources.
+                  Energy is cheap from renewables. Capacity is cheap from gas.
+                  <b style={{color:"#E8A838"}}> Hybrid optimizes both.</b>
+                </div>
+              </div>
+            </div>
+
+            {/* Storage Duration */}
+            <div style={PS}>
+              <div style={SL}>THE STORAGE DURATION PROBLEM</div>
+              <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginBottom:16}}>
+                Battery requirements <b style={{color:"#ef4444"}}>explode</b> as gas approaches 0%.
+              </div>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:8, marginBottom:16}}>
+                <div style={{background:"#10b98122", borderRadius:6, padding:10, textAlign:"center"}}>
+                  <div style={{fontSize:9, color:"#6B7280"}}>90%</div>
+                  <div style={{fontSize:18, color:"#10b981", fontWeight:700}}>4h</div>
+                </div>
+                <div style={{background:"#10b98122", borderRadius:6, padding:10, textAlign:"center"}}>
+                  <div style={{fontSize:9, color:"#6B7280"}}>95%</div>
+                  <div style={{fontSize:18, color:"#10b981", fontWeight:700}}>8h</div>
+                </div>
+                <div style={{background:"#eab30822", borderRadius:6, padding:10, textAlign:"center"}}>
+                  <div style={{fontSize:9, color:"#6B7280"}}>99%</div>
+                  <div style={{fontSize:18, color:"#eab308", fontWeight:700}}>24h</div>
+                </div>
+                <div style={{background:"#ef444422", borderRadius:6, padding:10, textAlign:"center"}}>
+                  <div style={{fontSize:9, color:"#6B7280"}}>99.9%</div>
+                  <div style={{fontSize:18, color:"#ef4444", fontWeight:700}}>72h</div>
+                </div>
+                <div style={{background:"#ef444444", borderRadius:6, padding:10, textAlign:"center"}}>
+                  <div style={{fontSize:9, color:"#6B7280"}}>99.99%</div>
+                  <div style={{fontSize:18, color:"#ef4444", fontWeight:700}}>168h</div>
+                  <div style={{fontSize:8, color:"#ef4444"}}>7 days!</div>
+                </div>
+              </div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
+                <div style={{background:"#ef444412", borderRadius:8, padding:14, border:"1px solid #ef444433"}}>
+                  <div style={{fontSize:10, color:"#ef4444", fontWeight:700, marginBottom:8}}>WHY EXPONENTIAL?</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.7}}>
+                    Weather follows <b style={{color:"#E8E6E1"}}>heavy-tailed distribution</b>:<br/>
+                    - Most gaps short (overnight)<br/>
+                    - Rare gaps VERY long (storms)<br/>
+                    - Must size for 1-in-10,000 event
+                  </div>
+                </div>
+                <div style={{background:"#10b98112", borderRadius:8, padding:14, border:"1px solid #10b98133"}}>
+                  <div style={{fontSize:10, color:"#10b981", fontWeight:700, marginBottom:8}}>WHY HYBRID FLAT?</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.7}}>
+                    With gas backup, battery only needs:<br/>
+                    - Daily shifting (4h)<br/>
+                    - Short ramps<br/>
+                    <b style={{color:"#10b981"}}>Gas handles the long-tail.</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Marginal Cost */}
+            <div style={PS}>
+              <div style={SL}>MARGINAL COST OF DISPLACEMENT</div>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
+                <div style={{background:"#10b98112", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#10b981", fontWeight:700, marginBottom:8}}>FIRST 35%</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
+                    Best hours displace gas.<br/>
+                    Minimal storage.<br/>
+                    <b style={{color:"#10b981"}}>~$15-25/MWh</b>
+                  </div>
+                </div>
+                <div style={{background:"#eab30812", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#eab308", fontWeight:700, marginBottom:8}}>35-65%</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
+                    4h battery needed.<br/>
+                    Still economic.<br/>
+                    <b style={{color:"#eab308"}}>~$40-60/MWh</b>
+                  </div>
+                </div>
+                <div style={{background:"#ef444412", borderRadius:8, padding:14}}>
+                  <div style={{fontSize:10, color:"#ef4444", fontWeight:700, marginBottom:8}}>LAST 35%</div>
+                  <div style={{fontSize:9, color:"#9CA3AF", lineHeight:1.6}}>
+                    Days of storage.<br/>
+                    Massive overbuild.<br/>
+                    <b style={{color:"#ef4444"}}>{">"} $200/MWh</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Theorem */}
+            <div style={{...PS, background:"linear-gradient(135deg, #E8A83815 0%, #3b82f615 100%)", border:"1px solid #E8A83844"}}>
+              <div style={{fontSize:12, color:"#E8A838", fontWeight:700, marginBottom:12}}>THE FUNDAMENTAL THEOREM</div>
+              <div style={{background:"#0f1115", borderRadius:8, padding:16, marginBottom:16}}>
+                <div style={{fontSize:11, color:"#E8E6E1", fontFamily:"monospace", textAlign:"center", lineHeight:2}}>
+                  Optimal f* minimizes: Total(f) = Capex(f) + Storage(f) + Fuel(f)<br/>
+                  Storage(f) grows exponentially as f approaches 0
+                </div>
+              </div>
+              <div style={{fontSize:10, color:"#E8E6E1", lineHeight:1.8}}>
+                1. Early renewable MWh cheap (good hours, minimal storage)<br/>
+                2. Later renewable MWh expensive (massive storage)<br/>
+                3. Crossover at ~35% gas defines the optimum
+              </div>
+            </div>
+
           </>)}
 
           {/* ===== SIZING ===== */}
