@@ -684,7 +684,7 @@ export default function App() {
   const [p, setP] = useState(DEF);
   const [tab, setTab] = useState("overview");
   const [tabOrder, setTabOrder] = useState(() => {
-    const defaultOrder = ["overview","thesis","buildout","breakdown","reliability","profiles","sld","tornado","scenarios","solar-wind corr"];
+    const defaultOrder = ["overview","solar-wind corr","thesis","breakdown","profiles","scenarios","tornado","sld","buildout"];
     const saved = localStorage.getItem("lcoe_tabOrder_v2");
     if (!saved) return defaultOrder;
     const parsed = JSON.parse(saved);
