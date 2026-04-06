@@ -1969,28 +1969,68 @@ export default function App() {
               <div style={{fontSize:10, color:"#9CA3AF", fontFamily:F.m, marginBottom:16}}>
                 Battery requirements <b style={{color:"#ef4444"}}>explode</b> as gas approaches 0%.
               </div>
-              <div style={{display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:8, marginBottom:16}}>
-                <div style={{background:"#10b98122", borderRadius:6, padding:10, textAlign:"center"}}>
-                  <div style={{fontSize:9, color:"#6B7280"}}>90%</div>
-                  <div style={{fontSize:18, color:"#10b981", fontWeight:700}}>4h</div>
-                </div>
-                <div style={{background:"#10b98122", borderRadius:6, padding:10, textAlign:"center"}}>
-                  <div style={{fontSize:9, color:"#6B7280"}}>95%</div>
-                  <div style={{fontSize:18, color:"#10b981", fontWeight:700}}>8h</div>
-                </div>
-                <div style={{background:"#eab30822", borderRadius:6, padding:10, textAlign:"center"}}>
-                  <div style={{fontSize:9, color:"#6B7280"}}>99%</div>
-                  <div style={{fontSize:18, color:"#eab308", fontWeight:700}}>24h</div>
-                </div>
-                <div style={{background:"#ef444422", borderRadius:6, padding:10, textAlign:"center"}}>
-                  <div style={{fontSize:9, color:"#6B7280"}}>99.9%</div>
-                  <div style={{fontSize:18, color:"#ef4444", fontWeight:700}}>72h</div>
-                </div>
-                <div style={{background:"#ef444444", borderRadius:6, padding:10, textAlign:"center"}}>
-                  <div style={{fontSize:9, color:"#6B7280"}}>99.99%</div>
-                  <div style={{fontSize:18, color:"#ef4444", fontWeight:700}}>168h</div>
-                  <div style={{fontSize:8, color:"#ef4444"}}>7 days!</div>
-                </div>
+              {/* Storage Duration Chart */}
+              {(()=>{
+                const W=720, H=280, pad={t:30,r:140,b:50,l:70};
+                const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+                const data = [
+                  {rel:90, renew:4, hybrid:4},
+                  {rel:95, renew:8, hybrid:4},
+                  {rel:99, renew:24, hybrid:4},
+                  {rel:99.9, renew:72, hybrid:4},
+                  {rel:99.99, renew:168, hybrid:4},
+                ];
+                const maxH = 180;
+                const x = (rel) => pad.l + ((rel-90)/10) * cw;
+                const y = (hrs) => pad.t + ch - (Math.min(hrs,maxH)/maxH) * ch;
+                return (
+                  <svg width={W} height={H} style={{display:"block", marginBottom:16}}>
+                    <rect x={pad.l} y={pad.t} width={cw*0.5} height={ch} fill="#10b98108"/>
+                    <rect x={pad.l+cw*0.5} y={pad.t} width={cw*0.5} height={ch} fill="#ef444408"/>
+                    {[0,24,48,72,120,168].map(hrs => (
+                      <g key={"g-"+hrs}>
+                        <line x1={pad.l} y1={y(hrs)} x2={pad.l+cw} y2={y(hrs)} stroke="#1E2330" strokeWidth={1}/>
+                        <text x={pad.l-8} y={y(hrs)+4} textAnchor="end" fill="#6B7280" fontSize={8} fontFamily={F.m}>{hrs}h</text>
+                      </g>
+                    ))}
+                    <rect x={x(99)} y={pad.t} width={x(100)-x(99)} height={ch} fill="#ef444415"/>
+                    <text x={x(99.5)} y={pad.t+15} textAnchor="middle" fill="#ef4444" fontSize={8} fontFamily={F.m}>Danger Zone</text>
+                    <line x1={pad.l} y1={pad.t+ch} x2={pad.l+cw} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
+                    <line x1={pad.l} y1={pad.t} x2={pad.l} y2={pad.t+ch} stroke="#4B5563" strokeWidth={2}/>
+                    <text x={pad.l+cw/2} y={H-10} textAnchor="middle" fill="#9CA3AF" fontSize={10} fontFamily={F.m}>Reliability Target (%)</text>
+                    <text x={18} y={pad.t+ch/2} textAnchor="middle" fill="#9CA3AF" fontSize={10} fontFamily={F.m} transform={`rotate(-90,18,${pad.t+ch/2})`}>Storage Duration (hours)</text>
+                    {data.map(d => (
+                      <text key={"x-"+d.rel} x={x(d.rel)} y={pad.t+ch+18} textAnchor="middle" fill="#6B7280" fontSize={9} fontFamily={F.m}>{d.rel}%</text>
+                    ))}
+                    <path d={data.map((d,i) => `${i===0?"M":"L"}${x(d.rel)},${y(d.renew)}`).join(" ")} stroke="#ef4444" strokeWidth={3} fill="none"/>
+                    {data.map(d => (
+                      <g key={"r-"+d.rel}>
+                        <circle cx={x(d.rel)} cy={y(d.renew)} r={6} fill="#ef4444"/>
+                        <text x={x(d.rel)} y={y(d.renew)-10} textAnchor="middle" fill="#ef4444" fontSize={9} fontWeight={700} fontFamily={F.m}>{d.renew}h</text>
+                      </g>
+                    ))}
+                    <path d={data.map((d,i) => `${i===0?"M":"L"}${x(d.rel)},${y(d.hybrid)}`).join(" ")} stroke="#10b981" strokeWidth={3} fill="none"/>
+                    {data.map(d => (
+                      <circle key={"h-"+d.rel} cx={x(d.rel)} cy={y(d.hybrid)} r={5} fill="#10b981"/>
+                    ))}
+                    <g transform={`translate(${pad.l+cw+15}, ${pad.t+20})`}>
+                      <line x1={0} y1={0} x2={25} y2={0} stroke="#ef4444" strokeWidth={3}/>
+                      <circle cx={12} cy={0} r={4} fill="#ef4444"/>
+                      <text x={32} y={4} fill="#ef4444" fontSize={9} fontFamily={F.m}>Renewables</text>
+                      <text x={32} y={16} fill="#ef4444" fontSize={8} fontFamily={F.m}>Only</text>
+                      <line x1={0} y1={40} x2={25} y2={40} stroke="#10b981" strokeWidth={3}/>
+                      <circle cx={12} cy={40} r={4} fill="#10b981"/>
+                      <text x={32} y={44} fill="#10b981" fontSize={9} fontFamily={F.m}>Hybrid</text>
+                      <text x={32} y={56} fill="#10b981" fontSize={8} fontFamily={F.m}>(Gas Backup)</text>
+                    </g>
+                    <text x={x(99.5)} y={y(120)-5} textAnchor="middle" fill="#E8E6E1" fontSize={9} fontFamily={F.m}>7 days of</text>
+                    <text x={x(99.5)} y={y(120)+8} textAnchor="middle" fill="#E8E6E1" fontSize={9} fontFamily={F.m}>storage!</text>
+                    <line x1={x(99.5)} y1={y(120)+12} x2={x(99.99)} y2={y(168)-10} stroke="#E8E6E1" strokeWidth={1} strokeDasharray="3,2"/>
+                  </svg>
+                );
+              })()}
+              <div style={{fontSize:9, color:"#6B7280", fontFamily:F.m, marginBottom:16, fontStyle:"italic", textAlign:"center"}}>
+                As reliability increases, renewables-only storage explodes exponentially while hybrid stays flat at 4 hours.
               </div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
                 <div style={{background:"#ef444412", borderRadius:8, padding:14, border:"1px solid #ef444433"}}>
